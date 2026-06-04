@@ -870,7 +870,7 @@ main { display: flex; flex: 1; overflow: hidden; }
 
     <div class="login-status" id="login-status"></div>
     <div class="login-footer">
-      <div class="version">v2.1.6 · 2026.06.04</div>
+      <div class="version">v2.1.7 · 2026.06.04</div>
       <div class="developer">开发人：小石头</div>
       <div class="copyright">本产品受知识产权保护，未经授权禁止复制、修改或商用，侵权必究</div>
     </div>
@@ -1316,13 +1316,7 @@ async function handleData(data, fromPeerId) {
 }
 
 async function enterApp() {
-  const allowedNames = ['懒洋洋', '大灰狼'];
-  if (!allowedNames.includes(myUsername)) {
-    // Show dev page for non-allowed users
-    document.getElementById('login-page').style.display = 'none';
-    document.getElementById('dev-page').classList.add('active');
-    return;
-  }
+  // Name restriction removed for testing
   await initEncryption(roomCode);
   await openDB();
   const saved = await loadState();
@@ -1706,9 +1700,12 @@ function startLocalTestMode() {
 function simulateLocalConnection(channel, remotePeerId) {
   showStatus('已检测到对方！正在建立连接...', 'info');
 
-  // Determine host: the one with lexicographically smaller peerId is host
+  // Use fixed room code for local test mode (both tabs need same code for encryption)
+  roomCode = 'LOCAL-TEST';
+
+  // Determine host: the one with lexicographically smaller username is host
   isHost = myUsername.localeCompare(remotePeerId) < 0;
-  roomCode = isHost ? genRoomId() : 'LOCAL';
+  console.log('Local test mode: I am', isHost ? 'HOST' : 'JOINER', 'myUsername:', myUsername, 'remotePeerId:', remotePeerId);
 
   // Register self
   allMembers[myUsername] = { peerId: 'local', online: true };
@@ -1723,7 +1720,7 @@ function simulateLocalConnection(channel, remotePeerId) {
   const fakePeerId = 'remote-peer';
   const broadcastWrapper = {
     send: (data) => {
-      try { channel.postMessage(data); } catch(e) {}
+      try { channel.postMessage(data); } catch(e) { console.error('BroadcastChannel send error:', e); }
     },
     close: () => { try { channel.close(); } catch(e) {} },
     get open() { return true; },
@@ -1739,10 +1736,11 @@ function simulateLocalConnection(channel, remotePeerId) {
 
   connections[fakePeerId] = { conn: broadcastWrapper, username: '' };
 
-  // Handle incoming messages
+  // Handle incoming messages - don't filter 'hello' messages, they're needed for handshake
   channel.addEventListener('message', (event) => {
-    if (event.data && event.data.type !== 'hello') {
+    if (event.data) {
       try {
+        console.log('Local channel received:', event.data.type);
         handleData(event.data, fakePeerId);
       } catch(e) {
         console.error('Local channel message error:', e);
@@ -1754,10 +1752,20 @@ function simulateLocalConnection(channel, remotePeerId) {
     showStatus('对方已断开连接', 'error');
   });
 
+  // Send hello message to trigger the handshake protocol
+  setTimeout(() => {
+    console.log('Sending hello message, isHost:', isHost);
+    broadcastWrapper.send({
+      type: 'hello',
+      username: myUsername,
+      peerId: 'local'
+    });
+  }, 300);
+
   setTimeout(() => {
     showStatus('本机连接成功！', 'success');
     setTimeout(() => enterApp(), 500);
-  }, 800);
+  }, 1200);
 }
 
 // UI toggle for direct connection mode
