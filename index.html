@@ -1,0 +1,2161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="canvas:aspect-ratio" content="16:9" />
+<title>暖暖小窝 - 局域网小工具</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script>
+// No external P2P library needed - using native WebRTC
+</script>
+<style>
+:root {
+  --seed-bg: #F8F8F0;
+  --seed-fg: #725D42;
+  --seed-primary: #19C8B9;
+  --seed-accent: #FFCC00;
+  --seed-surface: #F7F3DF;
+  --seed-radius: 50px;
+
+  --kids-cream: var(--seed-bg);
+  --kids-card: var(--seed-surface);
+  --kids-secondary: color-mix(in srgb, var(--seed-surface) 80%, var(--seed-fg) 8%);
+  --kids-title: color-mix(in srgb, var(--seed-fg) 70%, #794F27 30%);
+  --kids-text: var(--seed-fg);
+  --kids-muted: color-mix(in srgb, var(--seed-fg) 55%, var(--seed-surface) 45%);
+  --kids-disabled: color-mix(in srgb, var(--seed-fg) 30%, var(--seed-surface) 70%);
+  --kids-primary: var(--seed-primary);
+  --kids-primary-hover: color-mix(in srgb, var(--seed-primary) 85%, var(--white-pure) 15%);
+  --kids-primary-active: color-mix(in srgb, var(--seed-primary) 85%, #000 10%);
+  --kids-primary-wash: color-mix(in srgb, var(--seed-primary) 10%, var(--seed-bg) 90%);
+  --kids-focus: var(--seed-accent);
+  --kids-focus-shadow: color-mix(in srgb, var(--seed-accent) 80%, #000 10%);
+  --kids-success: #6FBA2C;
+  --kids-success-shadow: #5A9E1E;
+  --kids-warning: #F5C31C;
+  --kids-danger: #E05A5A;
+  --kids-button-shadow: color-mix(in srgb, var(--seed-fg) 30%, var(--seed-surface) 70%);
+  --kids-input-shadow: color-mix(in srgb, var(--seed-fg) 22%, var(--seed-surface) 78%);
+  --kids-sidebar-blue: #B7C6E5;
+  --kids-sidebar-hover: color-mix(in srgb, var(--seed-surface) 85%, #B7C6E5 15%);
+
+  --color-bg-page: var(--kids-cream);
+  --color-bg-surface: var(--kids-card);
+  --color-bg-soft: var(--kids-secondary);
+  --color-text-primary: var(--kids-title);
+  --color-text-body: var(--kids-text);
+  --color-text-muted: var(--kids-muted);
+  --color-action-primary: var(--kids-primary);
+
+  --radius-sm: 12px;
+  --radius-md: 20px;
+  --radius-lg: 24px;
+  --radius-pill: var(--seed-radius);
+
+  --density-scale: 1;
+
+  --shadow-button-rest: 0 5px 0 0 var(--kids-button-shadow);
+  --shadow-button-hover: 0 6px 0 0 var(--kids-button-shadow);
+  --shadow-button-active: 0 1px 0 0 var(--kids-button-shadow);
+  --shadow-input: 0 3px 0 0 var(--kids-input-shadow);
+  --shadow-card: 0 4px 10px rgba(107, 92, 67, 0.12);
+
+  --motion-fast: 0.15s;
+  --motion-base: 0.25s;
+  --motion-slow: 0.35s;
+  --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --font-display: 'Nunito', -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-body: 'Nunito', -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+
+  --tile-pink: #F8A6B2;
+  --tile-purple: #B77DEE;
+  --tile-blue: #889DF0;
+  --tile-yellow: #F7CD67;
+  --tile-orange: #E59266;
+  --tile-teal: #82D5BB;
+  --tile-green: #8AC68A;
+  --tile-red: #FC736D;
+
+  --input-hover-border: color-mix(in srgb, var(--seed-fg) 50%, var(--seed-surface) 50%);
+  --wash-green: #E8F5E0;
+  --wash-red: #FDECEA;
+  --wash-yellow: #FFF3D6;
+  --text-gold: #B8860B;
+  --white-pure: #ffffff;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+body {
+  font-family: var(--font-body);
+  font-weight: 500;
+  color: var(--color-text-body);
+  background: var(--color-bg-page);
+  line-height: 1.55;
+  overflow: hidden;
+  height: 100vh;
+}
+button { font-family: inherit; cursor: pointer; border: none; background: none; }
+input, select { font-family: inherit; border: none; outline: none; }
+:focus-visible { outline: 2px solid var(--kids-focus); outline-offset: 2px; }
+
+/* === LOGIN PAGE === */
+[data-component="Login Page"] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: var(--color-bg-page);
+}
+.login-card {
+  background: var(--kids-card);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 30px rgba(114, 93, 66, 0.15);
+  padding: 48px 40px;
+  width: 420px;
+  max-width: 92vw;
+  text-align: center;
+}
+.login-logo {
+  width: 80px; height: 80px;
+  margin: 0 auto 20px;
+  background: var(--kids-primary-wash);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.login-logo svg { width: 40px; height: 40px; color: var(--kids-primary); }
+.login-card h1 {
+  font-size: 28px; font-weight: 800;
+  color: var(--kids-title); letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+.login-card p {
+  font-size: 14px; color: var(--kids-muted);
+  margin-bottom: 28px;
+}
+.login-field { margin-bottom: 16px; text-align: left; }
+.login-field label {
+  display: block; font-size: 13px; font-weight: 600;
+  color: var(--kids-title); margin-bottom: 6px; letter-spacing: 0.02em;
+}
+.login-field .input { width: 100%; }
+.login-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 24px; }
+.login-divider {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 12px; color: var(--kids-muted); letter-spacing: 0.02em;
+}
+.login-divider::before, .login-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--kids-secondary);
+}
+.room-code-display {
+  background: var(--kids-primary-wash);
+  border: 2px dashed var(--kids-primary);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  margin-top: 16px;
+  cursor: pointer;
+  transition: all var(--motion-fast) var(--motion-ease);
+}
+.room-code-display:hover { background: var(--kids-primary); color: var(--white-pure); }
+.room-code-display:hover .room-code-label { color: rgba(255,255,255,0.8); }
+.room-code-display:hover .room-code-value { color: var(--white-pure); }
+.room-code-label { font-size: 12px; color: var(--kids-muted); letter-spacing: 0.02em; }
+.room-code-value {
+  font-size: 24px; font-weight: 800;
+  color: var(--kids-title); letter-spacing: 0.08em;
+  margin-top: 4px;
+}
+.login-status {
+  margin-top: 16px; padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px; font-weight: 500;
+  display: none;
+}
+.login-status.show { display: block; }
+.login-status.error { background: var(--wash-red); color: var(--kids-danger); }
+.login-status.success { background: var(--wash-green); color: var(--kids-success); }
+.login-status.info { background: var(--kids-primary-wash); color: var(--kids-primary); }
+
+/* Character selection */
+.char-select {
+  display: flex; gap: 12px; margin-top: 8px;
+}
+.char-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 18px 12px; border-radius: var(--radius-md);
+  background: var(--kids-cream); border: 2.5px solid var(--kids-disabled);
+  box-shadow: var(--shadow-input);
+  transition: all var(--motion-fast) var(--motion-ease);
+  cursor: pointer;
+}
+.char-btn:hover { border-color: var(--input-hover-border); transform: translateY(-2px); box-shadow: var(--shadow-button-hover); }
+.char-btn.selected { border-color: var(--kids-primary); background: var(--kids-primary-wash); box-shadow: var(--shadow-button-rest); }
+.char-btn.taken { opacity: 0.4; cursor: not-allowed; }
+.char-btn.taken:hover { transform: none; box-shadow: var(--shadow-input); }
+.char-btn .char-avatar {
+  width: 56px; height: 56px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; font-weight: 800; color: var(--white-pure);
+}
+.char-btn .char-name {
+  font-size: 15px; font-weight: 700; color: var(--kids-title); letter-spacing: -0.01em;
+}
+.char-btn .char-status {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+  padding: 2px 10px; border-radius: var(--radius-pill);
+}
+.char-status.available { background: var(--wash-green); color: var(--kids-success); }
+.char-status.occupied { background: var(--wash-red); color: var(--kids-danger); }
+
+/* Development page */
+.dev-page {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: var(--color-bg-page);
+  text-align: center;
+  gap: 24px;
+}
+.dev-page.active { display: flex; }
+.dev-page h1 {
+  font-size: 48px;
+  font-weight: 800;
+  color: var(--kids-title);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.dev-page p {
+  font-size: 18px;
+  color: var(--kids-muted);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.dev-page .back-btn {
+  margin-top: 16px;
+  padding: 12px 32px;
+  border-radius: var(--radius-pill);
+  background: var(--kids-secondary);
+  color: var(--kids-text);
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: var(--shadow-button-rest);
+  transition: all var(--motion-fast) var(--motion-ease);
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+}
+.dev-page .back-btn:hover {
+  background: var(--kids-card);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-button-hover);
+}
+.dev-page .back-btn:active {
+  transform: translateY(2px);
+  box-shadow: var(--shadow-button-active);
+}
+
+/* Direct Connection UI */
+.dc-divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 16px 0; color: var(--kids-muted); font-size: 12px;
+}
+.dc-divider::before, .dc-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--kids-secondary);
+}
+.dc-mode-btn {
+  width: 100%; padding: 12px; border-radius: var(--radius-pill);
+  background: var(--kids-primary); color: var(--white-pure);
+  font-size: 14px; font-weight: 600; border: none; cursor: pointer;
+  box-shadow: var(--shadow-button); transition: all var(--motion-fast) var(--motion-ease);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.dc-mode-btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-button-hover); }
+.dc-mode-btn:active { transform: translateY(2px); box-shadow: var(--shadow-button-active); }
+.dc-panel { display: none; margin-top: 16px; }
+.dc-panel.active { display: block; }
+.dc-step { margin-bottom: 12px; }
+.dc-step-label {
+  font-size: 12px; font-weight: 600; color: var(--kids-text);
+  margin-bottom: 6px; display: flex; align-items: center; gap: 6px;
+}
+.dc-step-num {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--kids-primary); color: var(--white-pure);
+  font-size: 11px; font-weight: 700; display: inline-flex;
+  align-items: center; justify-content: center;
+}
+.dc-textarea {
+  width: 100%; min-height: 60px; max-height: 120px;
+  padding: 10px 12px; border-radius: 12px;
+  border: 2px solid var(--kids-secondary); background: var(--kids-card);
+  color: var(--kids-text); font-size: 12px; font-family: monospace;
+  resize: vertical; outline: none;
+  transition: border-color var(--motion-fast) var(--motion-ease);
+}
+.dc-textarea:focus { border-color: var(--kids-focus); }
+.dc-textarea::placeholder { color: var(--kids-disabled); font-family: inherit; }
+.dc-copy-btn, .dc-paste-btn {
+  padding: 8px 16px; border-radius: var(--radius-pill);
+  font-size: 12px; font-weight: 600; border: none; cursor: pointer;
+  transition: all var(--motion-fast) var(--motion-ease);
+  margin-top: 6px;
+}
+.dc-copy-btn {
+  background: var(--kids-primary); color: var(--white-pure);
+  box-shadow: var(--shadow-button);
+}
+.dc-copy-btn:hover { transform: translateY(-1px); }
+.dc-paste-btn {
+  background: var(--kids-hover); color: var(--kids-text);
+}
+.dc-paste-btn:hover { background: var(--kids-secondary); }
+.dc-confirm-btn {
+  width: 100%; padding: 12px; border-radius: var(--radius-pill);
+  background: var(--kids-primary); color: var(--white-pure);
+  font-size: 14px; font-weight: 600; border: none; cursor: pointer;
+  box-shadow: var(--shadow-button); margin-top: 8px;
+  transition: all var(--motion-fast) var(--motion-ease);
+}
+.dc-confirm-btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-button-hover); }
+.dc-confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.dc-back-link {
+  display: inline-block; margin-top: 12px; font-size: 12px;
+  color: var(--kids-muted); cursor: pointer; text-decoration: underline;
+}
+.dc-back-link:hover { color: var(--kids-primary); }
+
+.login-footer {
+  margin-top: 24px; padding-top: 16px;
+  border-top: 1.5px solid var(--kids-secondary);
+  text-align: center;
+}
+.login-footer .version {
+  font-size: 12px; font-weight: 600;
+  color: var(--kids-muted); letter-spacing: 0.02em;
+  margin-bottom: 4px;
+}
+.login-footer .developer {
+  font-size: 12px; font-weight: 600;
+  color: var(--kids-text); letter-spacing: 0.01em;
+  margin-bottom: 4px;
+}
+.login-footer .copyright {
+  font-size: 11px; font-weight: 500;
+  color: var(--kids-disabled); letter-spacing: 0.01em;
+  line-height: 1.5;
+}
+
+/* Code protection */
+body { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; }
+input, textarea { -webkit-user-select: text; -moz-user-select: text; -ms-user-select: text; user-select: text; }
+
+/* === APP SHELL === */
+[data-component="App Shell"] {
+  display: none;
+  flex-direction: column;
+  height: 100vh;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+[data-component="App Shell"].active { display: flex; }
+main { display: flex; flex: 1; overflow: hidden; }
+.page { display: none; flex: 1; overflow: hidden; }
+.page.active { display: flex; }
+
+/* === BOTTOM TAB BAR === */
+[data-component="Tab Bar"] {
+  display: flex; align-items: center; justify-content: center;
+  gap: 12px; padding: 10px 20px 14px;
+  background: var(--color-bg-surface);
+  border-top: 2px solid var(--kids-secondary);
+  flex-shrink: 0;
+}
+.tab-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 10px 28px; border-radius: var(--radius-pill);
+  font-size: 13px; font-weight: 600; color: var(--kids-muted);
+  transition: all var(--motion-fast) var(--motion-ease);
+  min-width: 90px; letter-spacing: 0.02em;
+  position: relative;
+}
+.tab-btn svg { width: 26px; height: 26px; stroke-width: 1.8; transition: all var(--motion-fast) var(--motion-ease); }
+.tab-btn:hover { color: var(--kids-text); background: var(--kids-secondary); }
+.tab-btn.active { color: var(--kids-title); background: var(--kids-primary-wash); box-shadow: var(--shadow-button-rest); }
+.tab-btn.active svg { color: var(--kids-primary); }
+.tab-btn:active { transform: translateY(2px); box-shadow: var(--shadow-button-active); }
+.online-badge {
+  position: absolute; top: 6px; right: 12px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--kids-success);
+  border: 2px solid var(--kids-card);
+}
+
+/* === BUTTONS === */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 48px; padding: 0 28px; border-radius: var(--radius-pill);
+  font-size: 15px; font-weight: 600; letter-spacing: 0.02em;
+  transition: all var(--motion-fast) var(--motion-ease);
+  box-shadow: var(--shadow-button-rest); min-width: 48px;
+}
+.btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-button-hover); }
+.btn:active { transform: translateY(2px); box-shadow: var(--shadow-button-active); }
+.btn-primary { background: var(--kids-primary); color: var(--white-pure); }
+.btn-primary:hover { background: var(--kids-primary-hover); }
+.btn-primary:active { background: var(--kids-primary-active); }
+.btn-primary:disabled { background: var(--kids-disabled); box-shadow: none; cursor: not-allowed; transform: none; }
+.btn-secondary { background: var(--kids-secondary); color: var(--kids-text); }
+.btn-sm { height: 36px; padding: 0 16px; font-size: 13px; border-radius: 18px; }
+.btn-icon { width: 48px; padding: 0; border-radius: 50%; }
+.btn-icon.btn-sm { width: 36px; height: 36px; }
+
+/* === INPUTS === */
+.input {
+  height: 48px; padding: 0 22px; border-radius: var(--radius-pill);
+  border: 2.5px solid var(--kids-disabled); background: var(--kids-card);
+  font-size: 15px; font-weight: 500; color: var(--kids-text);
+  box-shadow: var(--shadow-input);
+  transition: all var(--motion-fast) var(--motion-ease);
+}
+.input::placeholder { color: var(--kids-disabled); font-weight: 400; }
+.input:hover { border-color: var(--input-hover-border); }
+.input:focus {
+  border-color: var(--kids-focus);
+  box-shadow: 0 3px 0 0 var(--kids-focus-shadow), 0 0 0 3px rgba(255, 204, 0, 0.15);
+}
+
+/* === CHAT PAGE === */
+[data-component="Chat Page"] { display: flex; flex: 1; overflow: hidden; }
+.contact-sidebar {
+  width: 300px; background: var(--color-bg-surface);
+  border-right: 2px solid var(--kids-secondary);
+  display: flex; flex-direction: column; flex-shrink: 0;
+}
+.sidebar-header {
+  padding: 20px; display: flex; align-items: center; gap: 12px;
+}
+.sidebar-header h2 { font-size: 22px; font-weight: 800; color: var(--kids-title); letter-spacing: -0.01em; }
+.sidebar-search { padding: 0 16px 12px; position: relative; }
+.sidebar-search .input { width: 100%; height: 42px; font-size: 14px; padding: 0 18px 0 42px; background: var(--kids-cream); }
+.sidebar-search svg { position: absolute; left: 30px; top: 50%; transform: translateY(-60%); width: 18px; height: 18px; color: var(--kids-muted); pointer-events: none; }
+.contact-list { flex: 1; overflow-y: auto; padding: 4px 8px; }
+.contact-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px; border-radius: var(--radius-md);
+  cursor: pointer; transition: all var(--motion-fast) var(--motion-ease); margin-bottom: 2px;
+}
+.contact-item:hover { background: var(--kids-sidebar-hover); }
+.contact-item.active { background: var(--kids-sidebar-blue); }
+.contact-avatar {
+  width: 48px; height: 48px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 700; color: var(--white-pure); flex-shrink: 0;
+}
+.contact-info { flex: 1; min-width: 0; }
+.contact-name { font-size: 15px; font-weight: 600; color: var(--kids-title); margin-bottom: 2px; }
+.contact-last-msg { font-size: 13px; color: var(--kids-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.contact-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+.contact-time { font-size: 11px; color: var(--kids-muted); letter-spacing: 0.01em; }
+.contact-badge {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--kids-danger); color: var(--white-pure);
+  font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.online-dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--kids-success); border: 2px solid var(--kids-card);
+  position: absolute; bottom: 0; right: 0;
+}
+.contact-avatar { position: relative; }
+
+/* Chat area */
+.chat-area { flex: 1; display: flex; flex-direction: column; background: var(--color-bg-page); }
+.chat-header {
+  padding: 16px 24px; background: var(--color-bg-surface);
+  border-bottom: 2px solid var(--kids-secondary);
+  display: flex; align-items: center; gap: 12px;
+}
+.chat-header-name { font-size: 18px; font-weight: 700; color: var(--kids-title); letter-spacing: -0.01em; }
+.chat-header-status { font-size: 12px; color: var(--kids-success); font-weight: 500; }
+.chat-search-bar { padding: 10px 24px; background: var(--color-bg-surface); border-bottom: 2px solid var(--kids-secondary); display: none; }
+.chat-search-bar.show { display: flex; gap: 10px; align-items: center; }
+.chat-search-bar .input { flex: 1; height: 40px; font-size: 14px; }
+.chat-messages {
+  flex: 1; overflow-y: auto;
+  padding: calc(20px * var(--density-scale)) 24px;
+  display: flex; flex-direction: column;
+  gap: calc(16px * var(--density-scale));
+}
+.msg-row { display: flex; gap: 10px; max-width: 75%; }
+.msg-row.sent { align-self: flex-end; flex-direction: row-reverse; }
+.msg-row.received { align-self: flex-start; }
+.msg-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 700; color: var(--white-pure); flex-shrink: 0;
+}
+.msg-content { display: flex; flex-direction: column; gap: 4px; }
+.msg-row.sent .msg-content { align-items: flex-end; }
+.msg-time { font-size: 11px; color: var(--kids-muted); letter-spacing: 0.01em; padding: 0 4px; }
+.msg-bubble {
+  padding: 12px 18px; border-radius: 20px;
+  font-size: 15px; line-height: 1.55; max-width: 100%; word-break: break-word;
+  transition: transform var(--motion-fast) var(--motion-ease);
+}
+.msg-bubble:hover { transform: scale(1.01); }
+.msg-row.received .msg-bubble {
+  background: var(--kids-card); color: var(--kids-text);
+  border-bottom-left-radius: 6px; box-shadow: var(--shadow-card);
+}
+.msg-row.sent .msg-bubble {
+  background: var(--kids-primary); color: var(--white-pure);
+  border-bottom-right-radius: 6px; box-shadow: 0 4px 10px rgba(25, 200, 185, 0.25);
+}
+.msg-bubble mark { background: var(--kids-focus); color: var(--kids-title); padding: 1px 4px; border-radius: 4px; }
+.msg-status {
+  font-size: 11px; font-weight: 500; color: var(--kids-muted);
+  letter-spacing: 0.01em; padding: 0 4px; display: inline-flex; align-items: center; gap: 4px;
+}
+.msg-status.read { color: var(--kids-primary); }
+.msg-recall {
+  font-size: 12px; color: var(--kids-muted); font-style: italic;
+  padding: 8px 16px; background: var(--kids-secondary); border-radius: var(--radius-sm);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.msg-row.sent .msg-actions {
+  display: flex; gap: 6px; align-items: center; margin-top: 2px;
+}
+.recall-btn {
+  font-size: 11px; font-weight: 600; color: var(--kids-muted);
+  padding: 2px 10px; border-radius: var(--radius-pill);
+  background: var(--kids-secondary); transition: all var(--motion-fast) var(--motion-ease);
+  letter-spacing: 0.02em; cursor: pointer;
+}
+.recall-btn:hover { background: var(--wash-red); color: var(--kids-danger); }
+.msg-date-divider { text-align: center; font-size: 12px; color: var(--kids-muted); padding: 8px 0; letter-spacing: 0.01em; }
+.msg-date-divider span { background: var(--kids-secondary); padding: 4px 16px; border-radius: var(--radius-pill); }
+
+.chat-input-area {
+  padding: 16px 24px; background: var(--color-bg-surface);
+  border-top: 2px solid var(--kids-secondary);
+  display: flex; gap: 12px; align-items: flex-end; position: relative;
+}
+.chat-input-wrap {
+  flex: 1; display: flex; align-items: center; gap: 8px;
+  background: var(--kids-cream); border: 2.5px solid var(--kids-disabled);
+  border-radius: var(--radius-pill); padding: 4px 6px 4px 18px;
+  box-shadow: var(--shadow-input); transition: all var(--motion-fast) var(--motion-ease);
+}
+.chat-input-wrap:focus-within {
+  border-color: var(--kids-focus);
+  box-shadow: 0 3px 0 0 var(--kids-focus-shadow), 0 0 0 3px rgba(255, 204, 0, 0.15);
+}
+.chat-input-wrap input { flex: 1; border: none; background: transparent; font-size: 15px; font-weight: 500; color: var(--kids-text); height: 40px; }
+.chat-input-wrap input::placeholder { color: var(--kids-disabled); }
+.emoji-btn {
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--kids-muted); transition: all var(--motion-fast) var(--motion-ease); flex-shrink: 0;
+}
+.emoji-btn:hover { background: var(--kids-secondary); color: var(--kids-text); }
+.emoji-btn svg { width: 22px; height: 22px; }
+.send-btn {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: var(--kids-primary); color: var(--white-pure);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--shadow-button-rest); transition: all var(--motion-fast) var(--motion-ease); flex-shrink: 0;
+}
+.send-btn:hover { background: var(--kids-primary-hover); transform: translateY(-1px); box-shadow: var(--shadow-button-hover); }
+.send-btn:active { background: var(--kids-primary-active); transform: translateY(2px); box-shadow: var(--shadow-button-active); }
+.send-btn svg { width: 22px; height: 22px; }
+.chat-toolbar { display: flex; gap: 4px; margin-left: auto; }
+.chat-toolbar .btn-icon { width: 40px; height: 40px; color: var(--kids-muted); }
+.chat-toolbar .btn-icon:hover { background: var(--kids-secondary); color: var(--kids-text); box-shadow: none; }
+.chat-toolbar .btn-icon svg { width: 20px; height: 20px; }
+
+.emoji-panel {
+  display: none; position: absolute; bottom: 80px; right: 80px;
+  width: 340px; background: var(--kids-card);
+  border: 2.5px solid var(--kids-secondary); border-radius: var(--radius-lg);
+  box-shadow: 0 8px 24px rgba(114, 93, 66, 0.2); padding: 16px; z-index: 100;
+}
+.emoji-panel.show { display: block; }
+.emoji-panel-title { font-size: 14px; font-weight: 700; color: var(--kids-title); margin-bottom: 12px; letter-spacing: -0.01em; }
+.emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+.emoji-item {
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  font-size: 22px; border-radius: var(--radius-sm); cursor: pointer;
+  transition: all var(--motion-fast) var(--motion-ease);
+}
+.emoji-item:hover { background: var(--kids-secondary); transform: scale(1.15); }
+.emoji-item:active { transform: scale(0.95); }
+
+.chat-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; color: var(--kids-muted); }
+.chat-empty svg { width: 80px; height: 80px; color: var(--kids-disabled); }
+.chat-empty p { font-size: 16px; font-weight: 500; }
+
+/* === TODO PAGE === */
+[data-component="Todo Page"] { flex-direction: column; padding: 0; overflow: hidden; }
+.todo-container {
+  max-width: 720px; width: 100%; margin: 0 auto;
+  display: flex; flex-direction: column; height: 100%; padding: 0 24px;
+}
+.todo-header { padding: 32px 0 20px; display: flex; align-items: center; justify-content: space-between; }
+.todo-header h1 { font-size: 32px; font-weight: 800; color: var(--kids-title); letter-spacing: -0.02em; line-height: 1.1; }
+.todo-stats { display: flex; gap: 12px; }
+.todo-stat { padding: 8px 18px; border-radius: var(--radius-pill); font-size: 13px; font-weight: 600; letter-spacing: 0.02em; }
+.todo-stat-total { background: var(--kids-primary-wash); color: var(--kids-primary); }
+.todo-stat-done { background: var(--wash-green); color: var(--kids-success); }
+.todo-add { display: flex; gap: 12px; margin-bottom: 8px; }
+.todo-add .input { flex: 1; }
+.priority-select {
+  height: 48px; padding: 0 18px; border-radius: var(--radius-pill);
+  border: 2.5px solid var(--kids-disabled); background: var(--kids-card);
+  font-size: 14px; font-weight: 600; color: var(--kids-text);
+  cursor: pointer; box-shadow: var(--shadow-input);
+  font-family: inherit; appearance: none; -webkit-appearance: none; padding-right: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239F927D' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center;
+  transition: all var(--motion-fast) var(--motion-ease);
+}
+.priority-select:focus { border-color: var(--kids-focus); box-shadow: 0 3px 0 0 var(--kids-focus-shadow), 0 0 0 3px rgba(255, 204, 0, 0.15); }
+.todo-filter { display: flex; gap: 8px; padding: 12px 0; }
+.filter-chip {
+  padding: 8px 20px; border-radius: var(--radius-pill);
+  font-size: 13px; font-weight: 600; color: var(--kids-muted);
+  transition: all var(--motion-fast) var(--motion-ease); letter-spacing: 0.02em;
+}
+.filter-chip:hover { background: var(--kids-secondary); color: var(--kids-text); }
+.filter-chip.active { background: var(--kids-primary); color: var(--white-pure); box-shadow: var(--shadow-button-rest); }
+.filter-chip:active { transform: translateY(1px); }
+.todo-list {
+  flex: 1; overflow-y: auto; padding: 8px 0 24px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.todo-item {
+  display: flex; align-items: center; gap: 14px;
+  padding: calc(16px * var(--density-scale)) calc(20px * var(--density-scale));
+  background: var(--kids-card); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card); transition: all var(--motion-base) var(--motion-ease);
+  animation: todoSlideIn 0.3s var(--motion-ease);
+}
+@keyframes todoSlideIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+.todo-item:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(114, 93, 66, 0.18); }
+.todo-item.done { opacity: 0.6; }
+.todo-item.done .todo-text { text-decoration: line-through; color: var(--kids-muted); }
+.todo-checkbox {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 3px solid var(--kids-disabled);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: all var(--motion-fast) var(--motion-ease); cursor: pointer;
+}
+.todo-checkbox:hover { border-color: var(--kids-primary); }
+.todo-item.done .todo-checkbox { background: var(--kids-success); border-color: var(--kids-success); }
+.todo-checkbox svg { width: 14px; height: 14px; color: var(--white-pure); display: none; }
+.todo-item.done .todo-checkbox svg { display: block; }
+.todo-text { flex: 1; font-size: 15px; font-weight: 500; color: var(--kids-text); }
+.todo-priority {
+  padding: 4px 14px; border-radius: var(--radius-pill);
+  font-size: 12px; font-weight: 700; letter-spacing: 0.02em; flex-shrink: 0;
+}
+.priority-high { background: var(--wash-red); color: var(--kids-danger); }
+.priority-medium { background: var(--wash-yellow); color: var(--text-gold); }
+.priority-low { background: var(--wash-green); color: var(--kids-success); }
+.todo-delete {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--kids-disabled); transition: all var(--motion-fast) var(--motion-ease); flex-shrink: 0;
+}
+.todo-delete:hover { background: var(--wash-red); color: var(--kids-danger); }
+.todo-delete svg { width: 18px; height: 18px; }
+.todo-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 60px 0; gap: 12px; color: var(--kids-muted);
+}
+.todo-empty svg { width: 64px; height: 64px; color: var(--kids-disabled); }
+.todo-empty p { font-size: 15px; font-weight: 500; }
+
+/* === LUNCH PAGE === */
+[data-component="Lunch Page"] { flex-direction: column; align-items: center; padding: 0; overflow: hidden; }
+.lunch-container { max-width: 800px; width: 100%; display: flex; flex-direction: column; height: 100%; padding: 0 24px; }
+.lunch-header { padding: 32px 0 16px; text-align: center; }
+.lunch-header h1 { font-size: 32px; font-weight: 800; color: var(--kids-title); letter-spacing: -0.02em; line-height: 1.1; margin-bottom: 8px; }
+.lunch-header p { font-size: 15px; color: var(--kids-muted); font-weight: 500; }
+.lunch-body { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 24px; overflow-y: auto; padding-bottom: 24px; }
+.spinner-wrap { position: relative; width: 320px; height: 320px; flex-shrink: 0; }
+.spinner-pointer {
+  position: absolute; top: -14px; left: 50%; transform: translateX(-50%); z-index: 10;
+  width: 0; height: 0;
+  border-left: 14px solid transparent; border-right: 14px solid transparent;
+  border-top: 28px solid var(--kids-danger);
+  filter: drop-shadow(0 3px 4px rgba(224, 90, 90, 0.3));
+}
+.spinner-wheel {
+  width: 100%; height: 100%; border-radius: 50%;
+  border: 5px solid var(--kids-card);
+  box-shadow: 0 6px 24px rgba(114, 93, 66, 0.2), inset 0 0 0 3px var(--kids-secondary);
+  transition: transform 3s cubic-bezier(0.17, 0.67, 0.12, 0.99);
+  overflow: hidden; position: relative; background: var(--kids-card);
+}
+.spinner-segment {
+  position: absolute; width: 50%; height: 50%; top: 0; left: 50%;
+  transform-origin: 0% 100%; display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.spinner-segment span {
+  display: block; font-size: 13px; font-weight: 700; color: var(--white-pure);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  transform: rotate(14deg) translateX(-20%) translateY(-10%);
+  white-space: nowrap; max-width: 80px; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.02em;
+}
+.spinner-center {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--kids-card); border: 4px solid var(--kids-secondary);
+  box-shadow: 0 3px 10px rgba(114, 93, 66, 0.2); z-index: 5;
+  display: flex; align-items: center; justify-content: center;
+}
+.lunch-result {
+  display: none; flex-direction: column; align-items: center; gap: 8px;
+  animation: resultPop 0.5s var(--motion-ease);
+}
+.lunch-result.show { display: flex; }
+@keyframes resultPop { 0% { opacity: 0; transform: scale(0.8); } 60% { transform: scale(1.05); } 100% { opacity: 1; transform: scale(1); } }
+.result-label { font-size: 14px; font-weight: 600; color: var(--kids-muted); letter-spacing: 0.02em; }
+.result-name {
+  font-size: 28px; font-weight: 800; color: var(--kids-title); letter-spacing: -0.02em; line-height: 1.2;
+  background: var(--kids-card); padding: 12px 32px; border-radius: var(--radius-pill); box-shadow: var(--shadow-card);
+}
+.food-manage { width: 100%; max-width: 480px; }
+.food-manage-title { font-size: 16px; font-weight: 700; color: var(--kids-title); margin-bottom: 12px; letter-spacing: -0.01em; }
+.food-add-row { display: flex; gap: 10px; margin-bottom: 14px; }
+.food-add-row .input { flex: 1; height: 44px; font-size: 14px; }
+.food-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.food-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: var(--radius-pill);
+  font-size: 14px; font-weight: 600; color: var(--white-pure);
+  box-shadow: 0 3px 0 0 rgba(0,0,0,0.1);
+  transition: all var(--motion-fast) var(--motion-ease); letter-spacing: 0.02em;
+}
+.food-tag:hover { transform: translateY(-1px); box-shadow: 0 4px 0 0 rgba(0,0,0,0.1); }
+.food-tag .remove-food {
+  width: 20px; height: 20px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.3); color: var(--white-pure);
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  transition: all var(--motion-fast) var(--motion-ease);
+}
+.food-tag .remove-food:hover { background: rgba(255,255,255,0.5); }
+.celebration { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 200; }
+.celebration.show { display: block; }
+.confetti { position: absolute; width: 10px; height: 10px; border-radius: 2px; animation: confettiFall 2s var(--motion-ease) forwards; }
+@keyframes confettiFall { 0% { transform: translateY(-20px) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
+
+/* Room info bar */
+.room-info-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 20px; background: var(--kids-primary-wash);
+  border-bottom: 2px solid var(--kids-secondary);
+  font-size: 13px; color: var(--kids-text);
+}
+.room-info-bar .room-id { font-weight: 700; color: var(--kids-primary); letter-spacing: 0.04em; }
+.room-info-bar .member-count {
+  padding: 3px 12px; border-radius: var(--radius-pill);
+  background: var(--kids-primary); color: var(--white-pure);
+  font-weight: 600; font-size: 12px;
+}
+.room-info-bar .leave-btn {
+  margin-left: auto; padding: 6px 16px;
+  border-radius: var(--radius-pill); font-size: 12px; font-weight: 600;
+  color: var(--kids-danger); background: var(--wash-red);
+  transition: all var(--motion-fast) var(--motion-ease);
+}
+.room-info-bar .leave-btn:hover { background: var(--kids-danger); color: var(--white-pure); }
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--kids-disabled); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--kids-muted); }
+
+@media (max-width: 1199px) { .contact-sidebar { width: 260px; } }
+@media (max-width: 767px) {
+  .contact-sidebar { width: 100%; position: absolute; z-index: 10; }
+  .chat-area { position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 20; display: none; }
+  .chat-area.mobile-show { display: flex; }
+  .msg-row { max-width: 88%; }
+  .spinner-wrap { width: 260px; height: 260px; }
+  .tab-btn { padding: 10px 16px; min-width: 70px; font-size: 12px; }
+  .tab-btn svg { width: 22px; height: 22px; }
+  .todo-header { flex-direction: column; gap: 12px; align-items: flex-start; }
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN PAGE -->
+<div data-component="Login Page" id="login-page" data-od-id="login-page">
+  <div class="login-card">
+    <div class="login-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    </div>
+    <h1>暖暖小窝</h1>
+    <p>局域网好友协作工具 · 支持直连（无需服务器）</p>
+
+    <div class="login-field">
+      <label for="username-input">你的昵称</label>
+      <input class="input" type="text" id="username-input" placeholder="输入你的昵称..." aria-label="输入昵称" maxlength="12" autocomplete="off" />
+    </div>
+
+    <div class="dc-divider">直连模式</div>
+
+    <button class="dc-mode-btn" id="dc-toggle-btn" style="display:none;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12h.01"/><path d="M12 12h.01"/><path d="M16 12h.01"/><path d="M21 12c0 4.4-4 8-9 8a9.8 9.8 0 0 1-4.2-1"/><path d="M3 12c0-4.4 4-8 9-8a9.8 9.8 0 0 1 4.2 1"/><path d="M6.7 20.7l-1 1"/><path d="M18.3 20.7l1 1"/><path d="M12 4V2"/></svg>
+      直连模式（无需服务器）
+    </button>
+
+    <!-- Direct Connect: Mode Choice -->
+    <div class="dc-panel active" id="dc-choice-panel">
+      <p style="font-size:13px;color:var(--kids-muted);margin-bottom:12px;text-align:center;">选择你的角色：</p>
+      <button class="dc-confirm-btn" id="dc-choice-create" style="margin-bottom:8px;">我要创建连接（发起方）</button>
+      <button class="dc-confirm-btn" id="dc-choice-join" style="background:var(--kids-hover);color:var(--kids-text);">我要加入连接（接收方）</button>
+      <span class="dc-back-link" id="dc-back-to-normal">← 返回普通模式</span>
+    </div>
+
+    <!-- Direct Connect: Create -->
+    <div class="dc-panel" id="dc-create-panel">
+      <div class="dc-step">
+        <div class="dc-step-label"><span class="dc-step-num">1</span> 生成邀请码，发给对方</div>
+        <textarea class="dc-textarea" id="dc-offer-output" readonly placeholder="正在生成..."></textarea>
+        <button class="dc-copy-btn" id="dc-copy-offer-btn">复制邀请码</button>
+      </div>
+      <div class="dc-step">
+        <div class="dc-step-label"><span class="dc-step-num">2</span> 粘贴对方给你的应答码</div>
+        <textarea class="dc-textarea" id="dc-answer-input" placeholder="在这里粘贴应答码..."></textarea>
+        <button class="dc-confirm-btn" id="dc-confirm-answer-btn">确认连接</button>
+      </div>
+      <span class="dc-back-link" id="dc-back-to-choice">← 返回选择</span>
+    </div>
+
+    <!-- Direct Connect: Join -->
+    <div class="dc-panel" id="dc-join-panel">
+      <div class="dc-step">
+        <div class="dc-step-label"><span class="dc-step-num">1</span> 粘贴对方给你的邀请码</div>
+        <textarea class="dc-textarea" id="dc-offer-input" placeholder="在这里粘贴邀请码..."></textarea>
+        <button class="dc-paste-btn" id="dc-paste-offer-btn">从剪贴板粘贴</button>
+      </div>
+      <div class="dc-step">
+        <div class="dc-step-label"><span class="dc-step-num">2</span> 生成应答码，发回给对方</div>
+        <textarea class="dc-textarea" id="dc-answer-output" readonly placeholder="等待粘贴邀请码..."></textarea>
+        <button class="dc-copy-btn" id="dc-copy-answer-btn">复制应答码</button>
+      </div>
+      <button class="dc-confirm-btn" id="dc-join-confirm-btn">确认连接</button>
+      <span class="dc-back-link" id="dc-back-to-choice-2">← 返回选择</span>
+    </div>
+
+    <div class="room-code-display" id="room-code-display" style="display:none;" title="点击复制">
+      <div class="room-code-label">你的房间码（分享给好友加入）</div>
+      <div class="room-code-value" id="room-code-value"></div>
+    </div>
+
+    <div class="login-status" id="login-status"></div>
+    <div class="login-footer">
+      <div class="version">v2.1.0 · 2026.06.04</div>
+      <div class="developer">开发人：小石头</div>
+      <div class="copyright">本产品受知识产权保护，未经授权禁止复制、修改或商用，侵权必究</div>
+    </div>
+  </div>
+</div>
+
+<!-- APP SHELL -->
+<div data-component="App Shell" id="app-shell" data-od-id="app-shell">
+  <div class="room-info-bar" data-component="Room Info" data-od-id="room-info">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    端到端加密 · 房间 <span class="room-id" id="room-id-display"></span>
+    <span class="member-count" id="member-count">1 人在线</span>
+    <button class="leave-btn" id="leave-room-btn">离开房间</button>
+  </div>
+
+  <main>
+  <!-- CHAT PAGE -->
+  <div class="page active" id="page-chat" data-component="Chat Page" data-od-id="chat-page">
+    <aside class="contact-sidebar" data-component="Contact Sidebar" data-od-id="contact-sidebar">
+      <div class="sidebar-header">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--kids-primary)"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <h2>消息</h2>
+      </div>
+      <div class="sidebar-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input class="input" type="text" placeholder="搜索联系人..." id="contact-search-input" aria-label="搜索联系人" />
+      </div>
+      <div class="contact-list" id="contact-list" data-component="Contact List" data-od-id="contact-list"></div>
+    </aside>
+    <div class="chat-area" id="chat-area" data-component="Chat Area" data-od-id="chat-area">
+      <div class="chat-empty" id="chat-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="9" y1="10" x2="15" y2="10"/><line x1="12" y1="7" x2="12" y2="13"/></svg>
+        <p>选择一个好友开始聊天吧</p>
+      </div>
+      <div id="chat-active-view" style="display:none;flex-direction:column;height:100%;">
+        <div class="chat-header">
+          <button class="btn-icon btn-sm" id="chat-back-btn" style="display:none;box-shadow:none;color:var(--kids-text);"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+          <div>
+            <div class="chat-header-name" id="chat-header-name"></div>
+            <div class="chat-header-status" id="chat-header-status">在线</div>
+          </div>
+          <div class="chat-toolbar">
+            <button class="btn-icon" id="toggle-search-btn" title="搜索聊天记录"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+            <button class="btn-icon" id="export-chat-btn" title="导出聊天记录" style="display:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+          </div>
+        </div>
+        <div class="chat-search-bar" id="chat-search-bar">
+          <input class="input" type="text" placeholder="搜索聊天记录..." id="chat-search-input" aria-label="搜索聊天记录" />
+          <button class="btn btn-sm" style="background:var(--kids-secondary);color:var(--kids-text);box-shadow:none;" id="close-chat-search">关闭</button>
+        </div>
+        <div class="chat-messages" id="chat-messages" data-component="Message List" data-od-id="message-list"></div>
+        <div class="chat-input-area">
+          <div class="chat-input-wrap">
+            <input type="text" id="msg-input" placeholder="输入消息..." aria-label="输入消息" />
+            <button class="emoji-btn" id="emoji-toggle" title="表情"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></button>
+          </div>
+          <button class="send-btn" id="send-btn" title="发送"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+          <div class="emoji-panel" id="emoji-panel"><div class="emoji-panel-title">常用表情</div><div class="emoji-grid" id="emoji-grid"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TODO PAGE -->
+  <div class="page" id="page-todo" data-component="Todo Page" data-od-id="todo-page">
+    <div class="todo-container">
+      <div class="todo-header">
+        <h1>待办事项</h1>
+        <div class="todo-stats">
+          <span class="todo-stat todo-stat-total" id="todo-total">0 项</span>
+          <span class="todo-stat todo-stat-done" id="todo-done">0 完成</span>
+        </div>
+      </div>
+      <div class="todo-add">
+        <input class="input" type="text" id="todo-input" placeholder="添加新任务..." aria-label="添加新任务" />
+        <select class="priority-select" id="priority-select" aria-label="选择优先级">
+          <option value="medium">普通</option>
+          <option value="high">紧急</option>
+          <option value="low">轻松</option>
+        </select>
+        <button class="btn btn-primary" id="add-todo-btn">添加</button>
+      </div>
+      <div class="todo-filter">
+        <button class="filter-chip active" data-filter="all">全部</button>
+        <button class="filter-chip" data-filter="active">进行中</button>
+        <button class="filter-chip" data-filter="done">已完成</button>
+      </div>
+      <div class="todo-list" id="todo-list" data-component="Todo List" data-od-id="todo-list"></div>
+    </div>
+  </div>
+
+  <!-- LUNCH PAGE -->
+  <div class="page" id="page-lunch" data-component="Lunch Page" data-od-id="lunch-page">
+    <div class="lunch-container">
+      <div class="lunch-header">
+        <h1>今天吃什么</h1>
+        <p>选择困难？让转盘帮你决定！</p>
+      </div>
+      <div class="lunch-body">
+        <div class="spinner-wrap">
+          <div class="spinner-pointer"></div>
+          <div class="spinner-wheel" id="spinner-wheel"></div>
+          <div class="spinner-center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--kids-title)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg></div>
+        </div>
+        <div class="spin-btn-wrap">
+          <button class="btn btn-primary" id="spin-btn" style="height:52px;padding:0 36px;font-size:17px;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            开始转！
+          </button>
+        </div>
+        <div class="lunch-result" id="lunch-result"><span class="result-label">今天就吃</span><span class="result-name" id="result-name"></span></div>
+        <div class="food-manage">
+          <div class="food-manage-title">菜品选项</div>
+          <div class="food-add-row">
+            <input class="input" type="text" id="food-input" placeholder="添加新菜品..." aria-label="添加新菜品" />
+            <button class="btn btn-primary btn-sm" id="add-food-btn">添加</button>
+          </div>
+          <div class="food-tags" id="food-tags"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </main>
+
+  <nav data-component="Tab Bar" data-od-id="tab-bar">
+    <button class="tab-btn active" data-page="chat">
+      <span class="online-badge" id="chat-badge" style="display:none;"></span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      聊天
+    </button>
+    <button class="tab-btn" data-page="todo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      待办
+    </button>
+    <button class="tab-btn" data-page="lunch">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+      午饭
+    </button>
+  </nav>
+</div>
+
+<div class="dev-page" id="dev-page">
+  <h1>开发中~~~~~~~~</h1>
+  <p>更多功能正在路上，敬请期待</p>
+  <button class="back-btn" id="dev-back-btn">返回登录</button>
+</div>
+
+<div class="celebration" id="celebration"></div>
+
+<script>
+/* ============================================================
+   P2P NETWORKING LAYER
+   ============================================================ */
+const avatarColors = ['var(--tile-pink)','var(--tile-purple)','var(--tile-blue)','var(--tile-orange)','var(--tile-teal)','var(--tile-red)','var(--tile-green)','var(--tile-yellow)'];
+function getColor(name) { let h=0; for(let i=0;i<name.length;i++) h=name.charCodeAt(i)+((h<<5)-h); return avatarColors[Math.abs(h)%avatarColors.length]; }
+function getInitial(name) { return name.charAt(0); }
+function formatTime(d) { const h=d.getHours().toString().padStart(2,'0'); const m=d.getMinutes().toString().padStart(2,'0'); return h+':'+m; }
+function genRoomId() { const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let r=''; for(let i=0;i<6;i++) r+=chars[Math.floor(Math.random()*chars.length)]; return r; }
+
+let peer = null;
+let myUsername = '';
+let isHost = false;
+let roomCode = '';
+let connections = {}; // peerId -> { conn, username }
+let hostConn = null;  // for clients: connection to host
+let allMembers = {};  // username -> { peerId, online }
+
+// Shared state (synced from host)
+let chatHistory = {}; // "userA<->userB" -> [{id, text, from, time, read, recalled}]
+let todos = [];
+let foods = ['黄焖鸡','麻辣烫','牛肉面','寿司','炸鸡','沙拉','饺子','螺蛳粉'];
+
+const RECALL_WINDOW = 120000; // 2 minutes
+let takenNames = {}; // tracks which names are currently in use
+let selectedName = '';
+
+   Direct connection only - no server needed
+   ============================================================ */
+
+function getChatKey(a, b) { return [a,b].sort().join('<->'); }
+function genMsgId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 6); }
+
+/* ============================================================
+   END-TO-END ENCRYPTION (AES-GCM via Web Crypto API)
+   ============================================================ */
+let cryptoKey = null;
+
+async function initEncryption(code) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', enc.encode('nnxiaowo-' + code), 'PBKDF2', false, ['deriveKey']
+  );
+  cryptoKey = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: enc.encode('nnxiaowo-salt-v1'), iterations: 100000, hash: 'SHA-256' },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function encryptText(text) {
+  if (!cryptoKey) return { c: text, iv: '' };
+  const enc = new TextEncoder();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, enc.encode(text));
+  return {
+    c: btoa(String.fromCharCode(...new Uint8Array(cipher))),
+    iv: btoa(String.fromCharCode(...iv))
+  };
+}
+
+async function decryptText(encrypted) {
+  if (!cryptoKey || !encrypted.iv) return encrypted.c;
+  const cipher = Uint8Array.from(atob(encrypted.c), c => c.charCodeAt(0));
+  const iv = Uint8Array.from(atob(encrypted.iv), c => c.charCodeAt(0));
+  const dec = new TextDecoder();
+  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, cipher);
+  return dec.decode(plain);
+}
+
+/* ============================================================
+   INDEXEDDB PERSISTENCE
+   ============================================================ */
+const DB_NAME = 'nnxiaowo-db';
+const DB_STORE = 'rooms';
+let db = null;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = e => { e.target.result.createObjectStore(DB_STORE); };
+    req.onsuccess = e => { db = e.target.result; resolve(db); };
+    req.onerror = () => resolve(null);
+  });
+}
+
+async function saveState() {
+  if (!db || !roomCode) return;
+  const state = { chatHistory, todos, foods };
+  const tx = db.transaction(DB_STORE, 'readwrite');
+  tx.objectStore(DB_STORE).put(state, roomCode);
+}
+
+async function loadState() {
+  if (!db || !roomCode) return;
+  return new Promise(resolve => {
+    const tx = db.transaction(DB_STORE, 'readonly');
+    const req = tx.objectStore(DB_STORE).get(roomCode);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => resolve(null);
+  });
+}
+
+function showStatus(msg, type) {
+  const el = document.getElementById('login-status');
+  el.textContent = msg; el.className = 'login-status show ' + type;
+}
+function clearStatus() { document.getElementById('login-status').className = 'login-status'; }
+
+function showNotification(title, body) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  try {
+    const n = new Notification(title, { body, icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">💬</text></svg>', silent: false });
+    setTimeout(() => n.close(), 5000);
+  } catch(e) {}
+}
+
+function broadcast(data, excludePeerId) {
+  Object.entries(connections).forEach(([pid, info]) => {
+    if (pid !== excludePeerId && info.conn && info.conn.open) {
+      try { info.conn.send(data); } catch(e) {}
+    }
+  });
+}
+
+function sendTo(username, data) {
+  const entry = Object.values(connections).find(c => c.username === username);
+  if (entry && entry.conn && entry.conn.open) {
+    try { entry.conn.send(data); } catch(e) {}
+  }
+}
+
+function broadcastSync() {
+  const data = { type: 'sync', chatHistory, todos, foods, members: Object.keys(allMembers) };
+  broadcast(data);
+}
+
+async function handleData(data, fromPeerId) {
+  switch(data.type) {
+    case 'hello':
+      // Name locking: check if the requested name is already taken
+      if (isHost && takenNames[data.username] && takenNames[data.username] !== fromPeerId) {
+        try { connections[fromPeerId].conn.send({ type: 'name-taken', name: data.username }); } catch(e) {}
+        return;
+      }
+      if (isHost) takenNames[data.username] = fromPeerId;
+      allMembers[data.username] = { peerId: fromPeerId, online: true };
+      connections[fromPeerId].username = data.username;
+      if (isHost) {
+        try {
+          connections[fromPeerId].conn.send({
+            type: 'sync', chatHistory, todos, foods,
+            members: Object.keys(allMembers), takenNames: Object.keys(takenNames)
+          });
+        } catch(e) {}
+        broadcast({ type: 'member-joined', username: data.username, members: Object.keys(allMembers), takenNames: Object.keys(takenNames) });
+      }
+      updateMemberCount();
+      renderContacts();
+
+      break;
+
+    case 'name-taken':
+      showStatus('「' + data.name + '」正在使用中，请选择另一个角色', 'error');
+      document.querySelectorAll('.char-btn').forEach(b => b.classList.remove('selected'));
+      selectedName = '';
+      document.getElementById('username-input').value = '';
+
+      break;
+
+    case 'sync':
+      if (!isHost) {
+        chatHistory = data.chatHistory || {};
+        todos = data.todos || [];
+        foods = data.foods || [];
+        if (data.members) {
+          data.members.forEach(m => { if (!allMembers[m]) allMembers[m] = { online: true }; });
+        }
+        if (data.takenNames) {
+          data.takenNames.forEach(n => { takenNames[n] = true; });
+        }
+        renderAll();
+        saveState();
+      }
+      break;
+
+    case 'chat':
+      {
+        const key = getChatKey(data.from, data.to);
+        if (!chatHistory[key]) chatHistory[key] = [];
+        const plainText = await decryptText(data.encrypted || { c: data.text, iv: '' });
+        chatHistory[key].push({ id: data.msgId, text: plainText, from: data.from, time: data.time, read: false, recalled: false });
+        if (isHost) {
+          broadcast({ type: 'chat', from: data.from, to: data.to, encrypted: data.encrypted, msgId: data.msgId, time: data.time }, fromPeerId);
+        }
+        if (data.to === myUsername || data.from === myUsername) {
+          renderMessages();
+          renderContacts();
+          // Show browser notification for incoming messages
+          if (data.to === myUsername && data.from !== myUsername) {
+            showNotification(data.from + ' 发来消息', plainText);
+          }
+        }
+        saveState();
+      }
+      break;
+
+    case 'read-receipt':
+      {
+        const key = getChatKey(data.from, data.to);
+        const msgs = chatHistory[key] || [];
+        let changed = false;
+        msgs.forEach(m => {
+          if (m.from === data.to && !m.read) { m.read = true; changed = true; }
+        });
+        if (changed && (data.to === myUsername || data.from === myUsername)) {
+          renderMessages();
+          saveState();
+        }
+      }
+      break;
+
+    case 'recall':
+      {
+        const key = getChatKey(data.from, data.to);
+        const msgs = chatHistory[key] || [];
+        const msg = msgs.find(m => m.id === data.msgId);
+        if (msg) { msg.recalled = true; msg.text = ''; }
+        if (isHost) broadcast({ type: 'recall', from: data.from, to: data.to, msgId: data.msgId }, fromPeerId);
+        if (data.to === myUsername || data.from === myUsername) {
+          renderMessages();
+          saveState();
+        }
+      }
+      break;
+
+    case 'todo-add':
+      todos.unshift(data.todo);
+      if (isHost) broadcast({ type: 'todo-add', todo: data.todo }, fromPeerId);
+      renderTodos();
+      saveState();
+      break;
+
+    case 'todo-toggle':
+      {
+        const t = todos.find(t => t.id === data.id);
+        if (t) t.done = data.done;
+        if (isHost) broadcast({ type: 'todo-toggle', id: data.id, done: data.done }, fromPeerId);
+        renderTodos();
+        saveState();
+      }
+      break;
+
+    case 'todo-delete':
+      todos = todos.filter(t => t.id !== data.id);
+      if (isHost) broadcast({ type: 'todo-delete', id: data.id }, fromPeerId);
+      renderTodos();
+      saveState();
+      break;
+
+    case 'food-add':
+      foods.push(data.food);
+      if (isHost) broadcast({ type: 'food-add', food: data.food }, fromPeerId);
+      renderWheel(); renderFoodTags();
+      saveState();
+      break;
+
+    case 'food-remove':
+      foods.splice(data.index, 1);
+      if (isHost) broadcast({ type: 'food-remove', index: data.index }, fromPeerId);
+      renderWheel(); renderFoodTags();
+      saveState();
+      break;
+
+    case 'member-joined':
+      allMembers[data.username] = { online: true };
+      if (data.takenNames) data.takenNames.forEach(n => { takenNames[n] = true; });
+      updateMemberCount();
+      renderContacts();
+
+      break;
+
+    case 'member-left':
+      if (allMembers[data.username]) allMembers[data.username].online = false;
+      delete takenNames[data.username];
+      updateMemberCount();
+      renderContacts();
+
+      break;
+  }
+}
+
+async function enterApp() {
+  const allowedNames = ['懒洋洋', '大灰狼'];
+  if (!allowedNames.includes(myUsername)) {
+    // Show dev page for non-allowed users
+    document.getElementById('login-page').style.display = 'none';
+    document.getElementById('dev-page').classList.add('active');
+    return;
+  }
+  await initEncryption(roomCode);
+  await openDB();
+  const saved = await loadState();
+  if (saved) {
+    chatHistory = saved.chatHistory || {};
+    todos = saved.todos || [];
+    foods = saved.foods || [];
+  }
+  // Request notification permission
+  if ('Notification' in window && Notification.permission === 'default') {
+    try { await Notification.requestPermission(); } catch(e) {}
+  }
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app-shell').classList.add('active');
+  document.getElementById('room-id-display').textContent = roomCode;
+  // Show export button only for 大灰狼
+  const exportBtn = document.getElementById('export-chat-btn');
+  if (exportBtn) exportBtn.style.display = myUsername === '大灰狼' ? 'inline-flex' : 'none';
+  updateMemberCount();
+  renderContacts();
+  renderTodos();
+  renderWheel();
+  renderFoodTags();
+}
+
+function leaveRoom() {
+  if (dcPeerConnection) {
+    // Direct connection mode cleanup
+    try { dcDataChannel.close(); } catch(e) {}
+    try { dcPeerConnection.close(); } catch(e) {}
+    dcPeerConnection = null;
+    dcDataChannel = null;
+    dcOffer = null;
+    dcAnswer = null;
+    dcMode = null;
+  }
+  if (peer) {
+    broadcast({ type: 'member-left', username: myUsername });
+    peer.destroy();
+  }
+  peer = null; connections = {}; allMembers = {}; takenNames = {};
+  chatHistory = {}; todos = []; selectedName = '';
+  document.getElementById('app-shell').classList.remove('active');
+  document.getElementById('login-page').style.display = 'flex';
+  document.getElementById('room-code-display').style.display = 'none';
+  document.getElementById('username-input').value = '';
+  clearStatus();
+}
+
+function updateMemberCount() {
+  const online = Object.values(allMembers).filter(m => m.online !== false).length;
+  document.getElementById('member-count').textContent = online + ' 人在线';
+  // Show chat badge when someone else is online
+  const othersOnline = Object.entries(allMembers).some(([n, m]) => n !== myUsername && m.online !== false);
+  document.getElementById('chat-badge').style.display = othersOnline ? 'block' : 'none';
+}
+
+/* ============================================================
+   DIRECT CONNECTION (WebRTC Manual Signaling - No Server)
+   ============================================================ */
+let dcMode = null; // 'create' or 'join'
+let dcPeerConnection = null;
+let dcDataChannel = null;
+let dcOffer = null;
+let dcAnswer = null;
+
+const iceConfig = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' }
+  ]
+};
+
+// Simple base64 encoding of SDP (no filtering to avoid breaking connection)
+function compressSDP(sdp) {
+  return btoa(unescape(encodeURIComponent(sdp)));
+}
+
+function decompressSDP(compressed) {
+  try {
+    return decodeURIComponent(escape(atob(compressed.trim())));
+  } catch (e) {
+    // Maybe it's already raw SDP
+    return compressed;
+  }
+}
+
+// Wait for ICE gathering to complete
+function waitForIceGathering(pc) {
+  return new Promise((resolve) => {
+    if (pc.iceGatheringState === 'complete') {
+      resolve();
+    } else {
+      pc.addEventListener('icegatheringstatechange', () => {
+        if (pc.iceGatheringState === 'complete') resolve();
+      });
+      // Timeout after 5 seconds
+      setTimeout(resolve, 5000);
+    }
+  });
+}
+
+// Create offer (for the creator)
+async function dcCreateOffer() {
+  dcPeerConnection = new RTCPeerConnection(iceConfig);
+
+  // Create data channel
+  dcDataChannel = dcPeerConnection.createDataChannel('nnxiaowo', { ordered: true });
+  setupDataChannel(dcDataChannel);
+
+  // Create offer
+  const offer = await dcPeerConnection.createOffer();
+  await dcPeerConnection.setLocalDescription(offer);
+
+  // Wait for ICE gathering
+  showStatus('正在生成邀请码...', 'info');
+  await waitForIceGathering(dcPeerConnection);
+
+  const fullSDP = dcPeerConnection.localDescription.sdp;
+  dcOffer = compressSDP(fullSDP);
+  document.getElementById('dc-offer-output').value = dcOffer;
+  showStatus('邀请码已生成！复制发给对方', 'success');
+}
+
+// Handle answer (for the creator)
+async function dcHandleAnswer(answerText) {
+  if (!dcPeerConnection || !answerText.trim()) {
+    showStatus('请粘贴有效的应答码', 'error');
+    return;
+  }
+
+  try {
+    const sdp = decompressSDP(answerText.trim());
+    await dcPeerConnection.setRemoteDescription({ type: 'answer', sdp });
+    showStatus('正在建立直连...', 'info');
+  } catch (e) {
+    showStatus('应答码无效，请确认复制正确', 'error');
+    console.error('Set remote description error:', e);
+  }
+}
+
+// Handle offer (for the joiner)
+async function dcHandleOffer(offerText) {
+  if (!offerText.trim()) {
+    showStatus('请粘贴有效的邀请码', 'error');
+    return;
+  }
+
+  dcPeerConnection = new RTCPeerConnection(iceConfig);
+
+  // Listen for data channel from creator
+  dcPeerConnection.addEventListener('datachannel', (event) => {
+    dcDataChannel = event.channel;
+    setupDataChannel(dcDataChannel);
+  });
+
+  try {
+    const sdp = decompressSDP(offerText.trim());
+    await dcPeerConnection.setRemoteDescription({ type: 'offer', sdp });
+  } catch (e) {
+    showStatus('邀请码无效，请确认复制正确', 'error');
+    console.error('Set remote description error:', e);
+    return;
+  }
+
+  // Create answer
+  const answer = await dcPeerConnection.createAnswer();
+  await dcPeerConnection.setLocalDescription(answer);
+
+  showStatus('正在生成应答码...', 'info');
+  await waitForIceGathering(dcPeerConnection);
+
+  const fullSDP = dcPeerConnection.localDescription.sdp;
+  dcAnswer = compressSDP(fullSDP);
+  document.getElementById('dc-answer-output').value = dcAnswer;
+  showStatus('应答码已生成！复制发回给对方', 'success');
+}
+
+// Setup data channel event handlers
+function setupDataChannel(channel) {
+  channel.addEventListener('open', () => {
+    showStatus('直连成功！', 'success');
+    isHost = (dcMode === 'create');
+    roomCode = isHost ? genRoomId() : 'DIRECT';
+
+    // Register self
+    allMembers[myUsername] = { peerId: 'local', online: true };
+    takenNames[myUsername] = 'local';
+
+    if (isHost) {
+      document.getElementById('room-code-display').style.display = 'block';
+      document.getElementById('room-code-value').textContent = roomCode;
+    }
+
+    // Use data channel as the "connection"
+    const fakePeerId = 'remote-peer';
+    connections[fakePeerId] = { conn: createDCWrapper(channel), username: '' };
+
+    setTimeout(() => enterApp(), 500);
+  });
+
+  channel.addEventListener('message', (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      // Route through the same handleData function
+      handleData(data, 'remote-peer');
+    } catch (e) {
+      console.error('Data channel message error:', e);
+    }
+  });
+
+  channel.addEventListener('close', () => {
+    showStatus('对方已断开连接', 'error');
+  });
+
+  channel.addEventListener('error', (e) => {
+    console.error('Data channel error:', e);
+    showStatus('连接出错', 'error');
+  });
+}
+
+// Wrapper to make DataChannel look like PeerJS connection
+function createDCWrapper(channel) {
+  const wrapper = {
+    send: (data) => {
+      if (channel.readyState === 'open') {
+        try { channel.send(JSON.stringify(data)); } catch(e) {}
+      }
+    },
+    close: () => { try { channel.close(); } catch(e) {} },
+    get open() { return channel.readyState === 'open'; },
+    peer: 'remote-peer',
+    on: (event, handler) => {
+      if (event === 'data') {
+        channel.addEventListener('message', (e) => {
+          try { handler(JSON.parse(e.data)); } catch(err) {}
+        });
+      }
+    }
+  };
+  return wrapper;
+}
+
+// UI toggle for direct connection mode
+function hideAllDCPanels() {
+  ['dc-choice-panel', 'dc-create-panel', 'dc-join-panel'].forEach(id => {
+    document.getElementById(id).classList.remove('active');
+  });
+}
+
+function showDCPanel(panelId) {
+  hideAllDCPanels();
+  document.getElementById(panelId).classList.add('active');
+}
+
+function toggleDirectConnect() {
+  // Just go back to choice panel
+  hideAllDCPanels();
+  showDCPanel('dc-choice-panel');
+  dcMode = null;
+  clearStatus();
+}
+
+// Event listeners for direct connection UI
+function setupDirectConnectUI() {
+  // Back links - go to choice panel
+  document.getElementById('dc-back-to-normal').addEventListener('click', () => {
+    hideAllDCPanels();
+    showDCPanel('dc-choice-panel');
+    dcMode = null;
+    clearStatus();
+  });
+  document.getElementById('dc-back-to-choice').addEventListener('click', () => showDCPanel('dc-choice-panel'));
+  document.getElementById('dc-back-to-choice-2').addEventListener('click', () => showDCPanel('dc-choice-panel'));
+
+  // Choice buttons
+  document.getElementById('dc-choice-create').addEventListener('click', () => {
+    dcMode = 'create';
+    showDCPanel('dc-create-panel');
+    myUsername = document.getElementById('username-input').value.trim();
+    if (!myUsername) { showStatus('请先输入昵称', 'error'); return; }
+    selectedName = myUsername;
+    isHost = true;
+    dcCreateOffer();
+  });
+
+  document.getElementById('dc-choice-join').addEventListener('click', () => {
+    dcMode = 'join';
+    showDCPanel('dc-join-panel');
+    myUsername = document.getElementById('username-input').value.trim();
+    if (!myUsername) { showStatus('请先输入昵称', 'error'); return; }
+    selectedName = myUsername;
+    isHost = false;
+  });
+
+  // Create flow
+  document.getElementById('dc-copy-offer-btn').addEventListener('click', () => {
+    const output = document.getElementById('dc-offer-output');
+    if (!output.value) return;
+    navigator.clipboard.writeText(output.value).then(() => {
+      showStatus('邀请码已复制！发给对方', 'success');
+    }).catch(() => {
+      output.select();
+      document.execCommand('copy');
+      showStatus('邀请码已复制！', 'success');
+    });
+  });
+
+  document.getElementById('dc-confirm-answer-btn').addEventListener('click', () => {
+    const answerText = document.getElementById('dc-answer-input').value;
+    dcHandleAnswer(answerText);
+  });
+
+  // Join flow
+  document.getElementById('dc-paste-offer-btn').addEventListener('click', async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      document.getElementById('dc-offer-input').value = text;
+      showStatus('已粘贴！等待生成应答码...', 'info');
+      await dcHandleOffer(text);
+    } catch (e) {
+      showStatus('无法读取剪贴板，请手动粘贴', 'error');
+    }
+  });
+
+  document.getElementById('dc-offer-input').addEventListener('input', async (e) => {
+    const text = e.target.value.trim();
+    if (text.length > 50 && !dcAnswer) {
+      await dcHandleOffer(text);
+    }
+  });
+
+  document.getElementById('dc-copy-answer-btn').addEventListener('click', () => {
+    const output = document.getElementById('dc-answer-output');
+    if (!output.value) return;
+    navigator.clipboard.writeText(output.value).then(() => {
+      showStatus('应答码已复制！发回给对方', 'success');
+    }).catch(() => {
+      output.select();
+      document.execCommand('copy');
+      showStatus('应答码已复制！', 'success');
+    });
+  });
+
+  document.getElementById('dc-join-confirm-btn').addEventListener('click', () => {
+    if (dcDataChannel && dcDataChannel.readyState === 'open') {
+      showStatus('直连成功！', 'success');
+    } else {
+      showStatus('等待对方确认连接...', 'info');
+    }
+  });
+}
+
+document.getElementById('leave-room-btn').addEventListener('click', leaveRoom);
+document.getElementById('dev-back-btn').addEventListener('click', () => {
+  if (peer) { peer.destroy(); peer = null; }
+  connections = {}; allMembers = {}; takenNames = {};
+  chatHistory = {}; todos = []; selectedName = '';
+  document.getElementById('dev-page').classList.remove('active');
+  document.getElementById('login-page').style.display = 'flex';
+  document.getElementById('room-code-display').style.display = 'none';
+  document.getElementById('username-input').value = '';
+  clearStatus();
+});
+document.getElementById('username-input').addEventListener('keydown', e => { if(e.key==='Enter') { /* no-op */ } });
+document.getElementById('room-code-display').addEventListener('click', () => {
+  navigator.clipboard.writeText(roomCode).then(() => showStatus('房间码已复制！','success')).catch(()=>{});
+});
+
+
+
+/* ============================================================
+   TAB SWITCHING
+   ============================================================ */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + btn.dataset.page).classList.add('active');
+  });
+});
+
+/* ============================================================
+   CHAT
+   ============================================================ */
+let activeContactName = null;
+
+function getContactNames() {
+  return Object.keys(allMembers).filter(n => n !== myUsername);
+}
+
+function renderContacts(filter) {
+  const list = document.getElementById('contact-list');
+  const q = (filter || '').toLowerCase();
+  const names = getContactNames().filter(n => !q || n.toLowerCase().includes(q));
+
+  list.innerHTML = names.map(name => {
+    const key = getChatKey(myUsername, name);
+    const msgs = chatHistory[key] || [];
+    const last = msgs.filter(m => !m.recalled).slice(-1)[0] || null;
+    const isOnline = allMembers[name] && allMembers[name].online !== false;
+    const statusColor = isOnline ? 'var(--kids-success)' : 'var(--kids-disabled)';
+    const statusText = isOnline ? '在线' : '离线';
+    return `<div class="contact-item ${activeContactName===name?'active':''}" data-name="${name}">
+      <div class="contact-avatar" style="background:${getColor(name)}">
+        ${getInitial(name)}
+        ${isOnline ? '<span class="online-dot"></span>' : ''}
+      </div>
+      <div class="contact-info">
+        <div class="contact-name">${name} <span style="font-size:11px;font-weight:500;color:${statusColor};margin-left:4px;">${statusText}</span></div>
+        <div class="contact-last-msg">${last ? (last.recalled ? '<i style="color:var(--kids-muted)">[消息已撤回]</i>' : (last.from === myUsername ? '我: ' : '') + last.text) : '开始聊天吧'}</div>
+      </div>
+      <div class="contact-meta">
+        <span class="contact-time">${last ? formatTime(new Date(last.time)) : ''}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('.contact-item').forEach(el => {
+    el.addEventListener('click', () => selectContact(el.dataset.name));
+  });
+}
+
+function selectContact(name) {
+  activeContactName = name;
+  document.getElementById('chat-empty').style.display = 'none';
+  document.getElementById('chat-active-view').style.display = 'flex';
+  document.getElementById('chat-header-name').textContent = name;
+  const isOnline = allMembers[name] && allMembers[name].online !== false;
+  document.getElementById('chat-header-status').textContent = isOnline ? '在线' : '离线';
+  document.getElementById('chat-header-status').style.color = isOnline ? 'var(--kids-success)' : 'var(--kids-muted)';
+  document.getElementById('chat-area').classList.add('mobile-show');
+  renderContacts(document.getElementById('contact-search-input').value);
+  renderMessages();
+  closeChatSearch();
+}
+
+function renderMessages(searchQuery) {
+  if (!activeContactName) return;
+  const container = document.getElementById('chat-messages');
+  const key = getChatKey(myUsername, activeContactName);
+  let msgs = chatHistory[key] || [];
+  const q = (searchQuery || '').toLowerCase();
+
+  // Send read receipt for received messages
+  const unread = msgs.filter(m => m.from !== myUsername && !m.read);
+  if (unread.length > 0) {
+    unread.forEach(m => m.read = true);
+    saveState();
+    // Send read receipt to sender
+    const receiptData = { type: 'read-receipt', from: myUsername, to: activeContactName };
+    if (isHost) sendTo(activeContactName, receiptData);
+    else { try { broadcast(receiptData); } catch(e) {} }
+  }
+
+  let html = '<div class="msg-date-divider"><span>聊天记录</span></div>';
+  msgs.forEach(m => {
+    if (m.recalled) {
+      html += `<div class="msg-row" style="justify-content:center;max-width:100%;"><div class="msg-recall">「${m.from}」撤回了一条消息</div></div>`;
+      return;
+    }
+    let text = m.text;
+    if (q && text.toLowerCase().includes(q)) {
+      const regex = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi');
+      text = text.replace(regex, '<mark>$1</mark>');
+    } else if (q) { return; }
+    const isSent = m.from === myUsername;
+    const canRecall = isSent && (Date.now() - new Date(m.time).getTime()) < RECALL_WINDOW;
+    const statusHtml = isSent ? `<span class="msg-status ${m.read ? 'read' : ''}">${m.read ? '已读' : '已发送'}</span>` : '';
+    const recallHtml = canRecall ? `<button class="recall-btn" data-msg-id="${m.id}" data-from="${m.from}" data-to="${activeContactName}">撤回</button>` : '';
+
+    html += `<div class="msg-row ${isSent ? 'sent' : 'received'}">
+      <div class="msg-avatar" style="background:${getColor(m.from)}">${getInitial(m.from)}</div>
+      <div class="msg-content">
+        <div class="msg-bubble">${text}</div>
+        <div class="msg-actions" style="display:flex;gap:6px;align-items:center;">
+          <div class="msg-time">${formatTime(new Date(m.time))}</div>
+          ${statusHtml}
+          ${recallHtml}
+        </div>
+      </div>
+    </div>`;
+  });
+
+  if (msgs.length === 0) {
+    html += `<div class="chat-empty" style="flex:none;padding:40px 0;"><p>还没有聊天记录，发条消息吧</p></div>`;
+  }
+  if (q && !msgs.some(m => !m.recalled && m.text.toLowerCase().includes(q))) {
+    html += `<div class="chat-empty" style="flex:none;padding:40px 0;"><p>没有找到匹配的消息</p></div>`;
+  }
+
+  container.innerHTML = html;
+  container.scrollTop = container.scrollHeight;
+
+  // Attach recall handlers
+  container.querySelectorAll('.recall-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const msgId = btn.dataset.msgId;
+      const from = btn.dataset.from;
+      const to = btn.dataset.to;
+      const msgKey = getChatKey(from, to);
+      const msgList = chatHistory[msgKey] || [];
+      const msg = msgList.find(m => m.id === msgId);
+      if (msg) {
+        msg.recalled = true; msg.text = '';
+        saveState();
+        const recallData = { type: 'recall', from, to, msgId };
+        if (isHost) { broadcast(recallData); }
+        else { try { broadcast(recallData); } catch(e) {} }
+        renderMessages();
+      }
+    });
+  });
+}
+
+async function sendMessage() {
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim();
+  if (!text || !activeContactName) return;
+
+  const msgId = genMsgId();
+  const encrypted = await encryptText(text);
+  const msgData = {
+    type: 'chat', from: myUsername, to: activeContactName,
+    encrypted, msgId, time: new Date().toISOString()
+  };
+
+  // Add locally (decrypted)
+  const key = getChatKey(myUsername, activeContactName);
+  if (!chatHistory[key]) chatHistory[key] = [];
+  chatHistory[key].push({ id: msgId, text, from: myUsername, time: msgData.time, read: false, recalled: false });
+  saveState();
+
+  // Send P2P (encrypted)
+  if (isHost) {
+    sendTo(activeContactName, msgData);
+    broadcast(msgData);
+  } else {
+    try { broadcast(msgData); } catch(e) {}
+  }
+
+  input.value = '';
+  renderMessages();
+  renderContacts(document.getElementById('contact-search-input').value);
+}
+
+document.getElementById('send-btn').addEventListener('click', sendMessage);
+document.getElementById('msg-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(); });
+document.getElementById('contact-search-input').addEventListener('input', e => renderContacts(e.target.value));
+document.getElementById('toggle-search-btn').addEventListener('click', () => {
+  const bar = document.getElementById('chat-search-bar');
+  bar.classList.toggle('show');
+  if (bar.classList.contains('show')) document.getElementById('chat-search-input').focus();
+  else closeChatSearch();
+});
+document.getElementById('close-chat-search').addEventListener('click', closeChatSearch);
+function closeChatSearch() {
+  document.getElementById('chat-search-bar').classList.remove('show');
+  document.getElementById('chat-search-input').value = '';
+  renderMessages();
+}
+document.getElementById('chat-search-input').addEventListener('input', e => renderMessages(e.target.value));
+document.getElementById('chat-back-btn').addEventListener('click', () => {
+  document.getElementById('chat-area').classList.remove('mobile-show');
+});
+
+// Export chat history (only for 大灰狼)
+document.getElementById('export-chat-btn').addEventListener('click', () => {
+  if (myUsername !== '大灰狼') { showStatus('仅大灰狼账号可导出', 'error'); return; }
+  let text = '暖暖小窝 - 聊天记录导出\n';
+  text += '导出时间: ' + new Date().toLocaleString('zh-CN') + '\n';
+  text += '房间: ' + roomCode + '\n';
+  text += '='.repeat(50) + '\n\n';
+  const keys = Object.keys(chatHistory).sort();
+  if (keys.length === 0) { text += '暂无聊天记录\n'; }
+  keys.forEach(key => {
+    const parts = key.split('<->');
+    text += '【' + parts.join(' <-> ') + '】\n';
+    const msgs = chatHistory[key] || [];
+    msgs.forEach(m => {
+      if (m.recalled) {
+        text += '  [' + formatTime(new Date(m.time)) + '] ' + m.from + ': [消息已撤回]\n';
+      } else {
+        text += '  [' + formatTime(new Date(m.time)) + '] ' + m.from + ': ' + m.text + (m.read ? ' (已读)' : '') + '\n';
+      }
+    });
+    text += '\n';
+  });
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '暖暖小窝_聊天记录_' + roomCode + '_' + new Date().toISOString().slice(0,10) + '.txt';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showStatus('聊天记录已导出', 'success');
+});
+
+// Emoji
+const emojis = ['😊','😂','🥰','😍','😎','🤔','😅','😭','👍','👏','❤️','🔥','🎉','🌟','💪','🙏','😋','🤗','😘','💕','🌈','🍀','🌸','🎈','☀️','🌙','⭐','🍕','🍜','🧋','🎂','🍰'];
+const emojiGrid = document.getElementById('emoji-grid');
+emojis.forEach(em => {
+  const el = document.createElement('div');
+  el.className = 'emoji-item'; el.textContent = em;
+  el.addEventListener('click', () => {
+    document.getElementById('msg-input').value += em;
+    document.getElementById('msg-input').focus();
+    document.getElementById('emoji-panel').classList.remove('show');
+  });
+  emojiGrid.appendChild(el);
+});
+document.getElementById('emoji-toggle').addEventListener('click', e => {
+  e.stopPropagation();
+  document.getElementById('emoji-panel').classList.toggle('show');
+});
+document.addEventListener('click', e => {
+  const panel = document.getElementById('emoji-panel');
+  const toggle = document.getElementById('emoji-toggle');
+  if (!panel.contains(e.target) && !toggle.contains(e.target)) panel.classList.remove('show');
+});
+
+/* ============================================================
+   TODO
+   ============================================================ */
+let todoFilter = 'all';
+let todoNextId = Date.now();
+
+function renderTodos() {
+  const list = document.getElementById('todo-list');
+  let filtered = todos;
+  if (todoFilter === 'active') filtered = todos.filter(t => !t.done);
+  if (todoFilter === 'done') filtered = todos.filter(t => t.done);
+
+  document.getElementById('todo-total').textContent = todos.length + ' 项';
+  document.getElementById('todo-done').textContent = todos.filter(t => t.done).length + ' 完成';
+
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="todo-empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      <p>${todoFilter === 'done' ? '还没有已完成的任务' : todoFilter === 'active' ? '所有任务都完成啦！' : '添加一个新任务开始吧'}</p>
+    </div>`;
+    return;
+  }
+  list.innerHTML = filtered.map(t => {
+    const pLabel = t.priority === 'high' ? '紧急' : t.priority === 'low' ? '轻松' : '普通';
+    return `<div class="todo-item ${t.done ? 'done' : ''}" data-id="${t.id}">
+      <div class="todo-checkbox" data-action="toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <span class="todo-text">${t.text}</span>
+      <span class="todo-priority priority-${t.priority}">${pLabel}</span>
+      <button class="todo-delete" data-action="delete" title="删除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.todo-item').forEach(el => {
+    el.querySelector('[data-action="toggle"]').addEventListener('click', () => {
+      const t = todos.find(t => t.id === parseInt(el.dataset.id));
+      if (t) {
+        t.done = !t.done;
+        if (isHost) broadcast({ type: 'todo-toggle', id: t.id, done: t.done });
+        else { try { broadcast({ type: 'todo-toggle', id: t.id, done: t.done }); } catch(e) {} }
+      }
+      renderTodos();
+      saveState();
+    });
+    el.querySelector('[data-action="delete"]').addEventListener('click', () => {
+      const id = parseInt(el.dataset.id);
+      todos = todos.filter(t => t.id !== id);
+      if (isHost) broadcast({ type: 'todo-delete', id });
+      else { try { broadcast({ type: 'todo-delete', id }); } catch(e) {} }
+      renderTodos();
+      saveState();
+    });
+  });
+}
+
+function addTodo() {
+  const input = document.getElementById('todo-input');
+  const text = input.value.trim();
+  if (!text) return;
+  const priority = document.getElementById('priority-select').value;
+  const todo = { id: todoNextId++, text, priority, done: false };
+  todos.unshift(todo);
+  input.value = '';
+
+  if (isHost) broadcast({ type: 'todo-add', todo });
+  else { try { broadcast({ type: 'todo-add', todo }); } catch(e) {} }
+  renderTodos();
+  saveState();
+}
+
+document.getElementById('add-todo-btn').addEventListener('click', addTodo);
+document.getElementById('todo-input').addEventListener('keydown', e => { if (e.key === 'Enter') addTodo(); });
+document.querySelectorAll('.filter-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    todoFilter = chip.dataset.filter;
+    renderTodos();
+  });
+});
+
+/* ============================================================
+   LUNCH SPINNER
+   ============================================================ */
+const segmentColors = ['var(--tile-pink)','var(--tile-blue)','var(--tile-teal)','var(--tile-orange)','var(--tile-purple)','var(--tile-red)','var(--tile-green)','var(--tile-yellow)','var(--tile-pink)','var(--tile-blue)'];
+let isSpinning = false;
+let currentRotation = 0;
+
+function renderWheel() {
+  const wheel = document.getElementById('spinner-wheel');
+  const n = foods.length;
+  if (n === 0) { wheel.innerHTML = ''; return; }
+  const angle = 360 / n;
+  wheel.innerHTML = foods.map((f, i) => {
+    const rot = i * angle; const skew = 90 - angle;
+    return `<div class="spinner-segment" style="transform:rotate(${rot}deg) skewY(-${skew}deg);background:${segmentColors[i % segmentColors.length]};"><span style="transform:rotate(${skew}deg) rotate(${angle/2}deg) translateX(-30%) translateY(-10%);">${f}</span></div>`;
+  }).join('');
+}
+
+function renderFoodTags() {
+  document.getElementById('food-tags').innerHTML = foods.map((f, i) =>
+    `<span class="food-tag" style="background:${segmentColors[i % segmentColors.length]}">${f}<span class="remove-food" data-idx="${i}">&times;</span></span>`
+  ).join('');
+  document.querySelectorAll('.remove-food').forEach(el => {
+    el.addEventListener('click', () => {
+      const idx = parseInt(el.dataset.idx);
+      foods.splice(idx, 1);
+      if (isHost) broadcast({ type: 'food-remove', index: idx });
+      else { try { broadcast({ type: 'food-remove', index: idx }); } catch(e) {} }
+      renderWheel(); renderFoodTags();
+      saveState();
+    });
+  });
+}
+
+document.getElementById('add-food-btn').addEventListener('click', () => {
+  const input = document.getElementById('food-input');
+  const text = input.value.trim();
+  if (!text || foods.length >= 10) return;
+  foods.push(text);
+  input.value = '';
+  if (isHost) broadcast({ type: 'food-add', food: text });
+  else { try { broadcast({ type: 'food-add', food: text }); } catch(e) {} }
+  renderWheel(); renderFoodTags();
+  saveState();
+});
+document.getElementById('food-input').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('add-food-btn').click(); });
+
+document.getElementById('spin-btn').addEventListener('click', () => {
+  if (isSpinning || foods.length < 2) return;
+  isSpinning = true;
+  const wheel = document.getElementById('spinner-wheel');
+  const btn = document.getElementById('spin-btn');
+  btn.disabled = true; btn.textContent = '转动中...';
+  document.getElementById('lunch-result').classList.remove('show');
+
+  const n = foods.length; const angle = 360 / n;
+  const winnerIdx = Math.floor(Math.random() * n);
+  const extraSpins = 5 + Math.floor(Math.random() * 3);
+  const targetAngle = 360 * extraSpins + (360 - winnerIdx * angle - angle / 2);
+  currentRotation += targetAngle;
+
+  wheel.style.transition = 'transform 3s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
+  wheel.style.transform = `rotate(${currentRotation}deg)`;
+
+  setTimeout(() => {
+    isSpinning = false; btn.disabled = false;
+    btn.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg> 再来一次！';
+    document.getElementById('result-name').textContent = foods[winnerIdx];
+    document.getElementById('lunch-result').classList.add('show');
+    showCelebration();
+  }, 3200);
+});
+
+function showCelebration() {
+  const cel = document.getElementById('celebration');
+  cel.classList.add('show'); cel.innerHTML = '';
+  const colors = ['var(--tile-pink)','var(--tile-purple)','var(--tile-blue)','var(--kids-focus)','var(--kids-success)','var(--tile-red)','var(--kids-primary)','var(--tile-orange)'];
+  for (let i = 0; i < 40; i++) {
+    const conf = document.createElement('div');
+    conf.className = 'confetti';
+    conf.style.left = Math.random() * 100 + '%';
+    conf.style.top = -10 + 'px';
+    conf.style.background = colors[Math.floor(Math.random() * colors.length)];
+    conf.style.animationDelay = Math.random() * 0.8 + 's';
+    conf.style.width = (6 + Math.random() * 8) + 'px';
+    conf.style.height = (6 + Math.random() * 8) + 'px';
+    cel.appendChild(conf);
+  }
+  setTimeout(() => { cel.classList.remove('show'); cel.innerHTML = ''; }, 2500);
+}
+
+/* ============================================================
+   RENDER ALL (after sync)
+   ============================================================ */
+function renderAll() {
+  renderContacts();
+  renderMessages();
+  renderTodos();
+  renderWheel();
+  renderFoodTags();
+  updateMemberCount();
+}
+
+/* ============================================================
+   CODE PROTECTION
+   ============================================================ */
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('keydown', e => {
+  if (e.key === 'F12') { e.preventDefault(); return false; }
+  if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i')) { e.preventDefault(); return false; }
+  if (e.ctrlKey && e.shiftKey && (e.key === 'J' || e.key === 'j')) { e.preventDefault(); return false; }
+  if (e.ctrlKey && e.shiftKey && (e.key === 'C' || e.key === 'c')) { e.preventDefault(); return false; }
+  if (e.ctrlKey && (e.key === 'U' || e.key === 'u')) { e.preventDefault(); return false; }
+  if (e.ctrlKey && (e.key === 'S' || e.key === 's')) { e.preventDefault(); return false; }
+});
+// Detect DevTools open (basic heuristic)
+(function() {
+  const threshold = 160;
+  const check = () => {
+    if (window.outerWidth - window.innerWidth > threshold || window.outerHeight - window.innerHeight > threshold) {
+      document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#725D42;background:#F8F8F0;"><div style="text-align:center;"><h2 style="font-size:24px;margin-bottom:8px;">开发者工具已禁用</h2><p style="font-size:14px;color:#9F927D;">本产品禁止查看源代码，请关闭开发者工具后刷新页面</p></div></div>';
+    }
+  };
+  setInterval(check, 1000);
+})();
+
+// Initialize direct connection UI
+(function() {
+  setupDirectConnectUI();
+  // Show the choice panel by default
+  showDCPanel('dc-choice-panel');
+})();
+</script>
+</body>
+</html>
