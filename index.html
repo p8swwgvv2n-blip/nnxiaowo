@@ -824,8 +824,12 @@ main { display: flex; flex: 1; overflow: hidden; }
     <div class="dc-panel active" id="dc-choice-panel">
       <p style="font-size:13px;color:var(--kids-muted);margin-bottom:12px;text-align:center;">选择你的角色：</p>
       <button class="dc-confirm-btn" id="dc-choice-create" style="margin-bottom:8px;">我要创建连接（发起方）</button>
-      <button class="dc-confirm-btn" id="dc-choice-join" style="background:var(--kids-hover);color:var(--kids-text);">我要加入连接（接收方）</button>
-      <span class="dc-back-link" id="dc-back-to-normal">← 返回普通模式</span>
+      <button class="dc-confirm-btn" id="dc-choice-join" style="background:var(--kids-hover);color:var(--kids-text);margin-bottom:12px;">我要加入连接（接收方）</button>
+      <div style="text-align:center;margin:8px 0 4px;">
+        <span style="font-size:11px;color:var(--kids-muted);">同一台设备测试？</span>
+        <a href="#" id="local-test-link" style="font-size:12px;color:var(--kids-primary);text-decoration:underline;margin-left:4px;">本机快速连接</a>
+      </div>
+      <span class="dc-back-link" id="dc-back-to-normal">← 返回</span>
     </div>
 
     <!-- Direct Connect: Create -->
@@ -866,7 +870,7 @@ main { display: flex; flex: 1; overflow: hidden; }
 
     <div class="login-status" id="login-status"></div>
     <div class="login-footer">
-      <div class="version">v2.1.0 · 2026.06.04</div>
+      <div class="version">v2.1.6 · 2026.06.04</div>
       <div class="developer">开发人：小石头</div>
       <div class="copyright">本产品受知识产权保护，未经授权禁止复制、修改或商用，侵权必究</div>
     </div>
@@ -1043,6 +1047,7 @@ const RECALL_WINDOW = 120000; // 2 minutes
 let takenNames = {}; // tracks which names are currently in use
 let selectedName = '';
 
+/* ============================================================
    Direct connection only - no server needed
    ============================================================ */
 
@@ -1386,11 +1391,9 @@ let dcAnswer = null;
 
 const iceConfig = {
   iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' }
+    { urls: 'stun:stun.qq.com:3478' },
+    { urls: 'stun:stun.stunprotocol.org:3478' },
+    { urls: 'stun:stun.l.google.com:19302' }
   ]
 };
 
@@ -1400,11 +1403,13 @@ function compressSDP(sdp) {
 }
 
 function decompressSDP(compressed) {
+  const cleaned = compressed.trim().replace(/[\r\n\s]+/g, '');
   try {
-    return decodeURIComponent(escape(atob(compressed.trim())));
+    return decodeURIComponent(escape(atob(cleaned)));
   } catch (e) {
-    // Maybe it's already raw SDP
-    return compressed;
+    // Maybe it's already raw SDP (not base64 encoded)
+    console.warn('Base64 decode failed, treating as raw SDP');
+    return compressed.trim();
   }
 }
 
@@ -1412,14 +1417,43 @@ function decompressSDP(compressed) {
 function waitForIceGathering(pc) {
   return new Promise((resolve) => {
     if (pc.iceGatheringState === 'complete') {
+      console.log('ICE gathering already complete');
       resolve();
-    } else {
-      pc.addEventListener('icegatheringstatechange', () => {
-        if (pc.iceGatheringState === 'complete') resolve();
-      });
-      // Timeout after 5 seconds
-      setTimeout(resolve, 5000);
+      return;
     }
+
+    let resolved = false;
+    let candidateCount = 0;
+    const done = () => {
+      if (!resolved) {
+        resolved = true;
+        console.log('ICE gathering done, candidates collected:', candidateCount);
+        resolve();
+      }
+    };
+
+    // Method 1: icegatheringstatechange event
+    pc.addEventListener('icegatheringstatechange', () => {
+      console.log('ICE gathering state:', pc.iceGatheringState);
+      if (pc.iceGatheringState === 'complete') done();
+    });
+
+    // Method 2: icecandidate event with null candidate (more reliable)
+    pc.addEventListener('icecandidate', (event) => {
+      if (event.candidate) {
+        candidateCount++;
+        console.log('ICE candidate:', event.candidate.candidate.substring(0, 80));
+      } else {
+        console.log('ICE candidate gathering finished (null candidate)');
+        done();
+      }
+    });
+
+    // Timeout after 8 seconds (longer for slow STUN servers)
+    setTimeout(() => {
+      console.log('ICE gathering timeout after 8s, candidates:', candidateCount);
+      done();
+    }, 8000);
   });
 }
 
@@ -1431,45 +1465,96 @@ async function dcCreateOffer() {
   dcDataChannel = dcPeerConnection.createDataChannel('nnxiaowo', { ordered: true });
   setupDataChannel(dcDataChannel);
 
+  // Debug: track connection state
+  dcPeerConnection.addEventListener('connectionstatechange', () => {
+    console.log('Connection state:', dcPeerConnection.connectionState);
+    if (dcPeerConnection.connectionState === 'failed') {
+      showStatus('连接失败，请检查网络后重试', 'error');
+    }
+  });
+  dcPeerConnection.addEventListener('iceconnectionstatechange', () => {
+    console.log('ICE connection state:', dcPeerConnection.iceConnectionState);
+  });
+
   // Create offer
   const offer = await dcPeerConnection.createOffer();
   await dcPeerConnection.setLocalDescription(offer);
+  console.log('After setLocalDescription(offer), signalingState:', dcPeerConnection.signalingState);
 
   // Wait for ICE gathering
   showStatus('正在生成邀请码...', 'info');
   await waitForIceGathering(dcPeerConnection);
+  console.log('After ICE gathering, signalingState:', dcPeerConnection.signalingState);
 
   const fullSDP = dcPeerConnection.localDescription.sdp;
+  // Count ICE candidates in SDP
+  const candidateLines = fullSDP.split('\n').filter(l => l.startsWith('a=candidate:'));
+  console.log('SDP contains', candidateLines.length, 'ICE candidates');
   dcOffer = compressSDP(fullSDP);
   document.getElementById('dc-offer-output').value = dcOffer;
-  showStatus('邀请码已生成！复制发给对方', 'success');
+  showStatus('邀请码已生成！(' + candidateLines.length + '个候选) 复制发给对方', 'success');
 }
 
 // Handle answer (for the creator)
 async function dcHandleAnswer(answerText) {
-  if (!dcPeerConnection || !answerText.trim()) {
+  const trimmed = answerText.trim();
+  if (!dcPeerConnection) {
+    showStatus('连接已失效，请重新生成邀请码', 'error');
+    return;
+  }
+  if (!trimmed) {
     showStatus('请粘贴有效的应答码', 'error');
     return;
   }
 
+  console.log('Before setRemoteDescription(answer), signalingState:', dcPeerConnection.signalingState);
+  console.log('Connection state:', dcPeerConnection.connectionState);
+  console.log('ICE connection state:', dcPeerConnection.iceConnectionState);
+
+  // Allow 'have-local-offer' or 'stable' states
+  if (dcPeerConnection.signalingState !== 'have-local-offer' && dcPeerConnection.signalingState !== 'stable') {
+    showStatus('连接状态异常 (' + dcPeerConnection.signalingState + ')，请重新生成邀请码', 'error');
+    console.error('Unexpected signaling state:', dcPeerConnection.signalingState);
+    return;
+  }
+
   try {
-    const sdp = decompressSDP(answerText.trim());
+    const sdp = decompressSDP(trimmed);
     await dcPeerConnection.setRemoteDescription({ type: 'answer', sdp });
     showStatus('正在建立直连...', 'info');
   } catch (e) {
-    showStatus('应答码无效，请确认复制正确', 'error');
+    showStatus('应答码无效：' + (e.message || '格式错误'), 'error');
     console.error('Set remote description error:', e);
+    console.error('Raw answer (first 200 chars):', trimmed.substring(0, 200));
   }
 }
 
 // Handle offer (for the joiner)
 async function dcHandleOffer(offerText) {
-  if (!offerText.trim()) {
+  const trimmed = offerText.trim();
+  if (!trimmed) {
     showStatus('请粘贴有效的邀请码', 'error');
     return;
   }
 
+  // Prevent duplicate connections
+  if (dcPeerConnection && dcPeerConnection.signalingState !== 'new') {
+    console.warn('Connection already in progress, ignoring duplicate offer');
+    return;
+  }
+
   dcPeerConnection = new RTCPeerConnection(iceConfig);
+
+  // Debug: track connection state
+  dcPeerConnection.addEventListener('connectionstatechange', () => {
+    console.log('Connection state:', dcPeerConnection.connectionState);
+    if (dcPeerConnection.connectionState === 'failed') {
+      showStatus('连接失败，请检查网络后重试', 'error');
+    }
+  });
+  dcPeerConnection.addEventListener('iceconnectionstatechange', () => {
+    console.log('ICE connection state:', dcPeerConnection.iceConnectionState);
+  });
 
   // Listen for data channel from creator
   dcPeerConnection.addEventListener('datachannel', (event) => {
@@ -1478,11 +1563,12 @@ async function dcHandleOffer(offerText) {
   });
 
   try {
-    const sdp = decompressSDP(offerText.trim());
+    const sdp = decompressSDP(trimmed);
     await dcPeerConnection.setRemoteDescription({ type: 'offer', sdp });
   } catch (e) {
-    showStatus('邀请码无效，请确认复制正确', 'error');
+    showStatus('邀请码无效：' + (e.message || '格式错误'), 'error');
     console.error('Set remote description error:', e);
+    console.error('Raw offer (first 200 chars):', trimmed.substring(0, 200));
     return;
   }
 
@@ -1564,6 +1650,116 @@ function createDCWrapper(channel) {
   return wrapper;
 }
 
+// Local test mode using BroadcastChannel (same-device testing)
+function startLocalTestMode() {
+  const channelId = 'nnxiaowo-local-' + Date.now();
+  const channel = new BroadcastChannel(channelId);
+  const peerId = 'peer-' + Math.random().toString(36).substr(2, 6);
+
+  // Announce presence
+  channel.postMessage({ type: 'hello', peerId, username: myUsername });
+
+  // Store channel ID for the other tab to join
+  // Use a simple approach: store in sessionStorage for the other tab to discover
+  // Since tabs share the same origin under HTTP, they can access the same storage
+  const existingChannels = JSON.parse(sessionStorage.getItem('nnxiaowo-local-channels') || '[]');
+  existingChannels.push({ id: channelId, peerId, username: myUsername, time: Date.now() });
+  sessionStorage.setItem('nnxiaowo-local-channels', JSON.stringify(existingChannels));
+
+  // Wait for another tab to connect
+  let connected = false;
+  channel.addEventListener('message', (event) => {
+    const data = event.data;
+    if (data.type === 'hello' && data.peerId !== peerId) {
+      // Another tab joined!
+      if (!connected) {
+        connected = true;
+        // Simulate the data channel connection
+        simulateLocalConnection(channel, data.peerId);
+      }
+    }
+  });
+
+  showStatus('等待另一个标签页打开此页面...', 'info');
+
+  // Auto-discover: check if another tab is already waiting
+  setTimeout(() => {
+    if (!connected) {
+      const channels = JSON.parse(sessionStorage.getItem('nnxiaowo-local-channels') || '[]');
+      const other = channels.find(c => c.peerId !== peerId && Date.now() - c.time < 30000);
+      if (other) {
+        connected = true;
+        channel.postMessage({ type: 'hello', peerId, username: myUsername });
+        simulateLocalConnection(channel, other.peerId);
+      }
+    }
+  }, 500);
+
+  // Timeout
+  setTimeout(() => {
+    if (!connected) {
+      showStatus('未检测到其他标签页，请在另一个标签页也点击"本机快速连接"', 'error');
+    }
+  }, 15000);
+}
+
+function simulateLocalConnection(channel, remotePeerId) {
+  showStatus('已检测到对方！正在建立连接...', 'info');
+
+  // Determine host: the one with lexicographically smaller peerId is host
+  isHost = myUsername.localeCompare(remotePeerId) < 0;
+  roomCode = isHost ? genRoomId() : 'LOCAL';
+
+  // Register self
+  allMembers[myUsername] = { peerId: 'local', online: true };
+  takenNames[myUsername] = 'local';
+
+  if (isHost) {
+    document.getElementById('room-code-display').style.display = 'block';
+    document.getElementById('room-code-value').textContent = roomCode;
+  }
+
+  // Create a fake connection wrapper using BroadcastChannel
+  const fakePeerId = 'remote-peer';
+  const broadcastWrapper = {
+    send: (data) => {
+      try { channel.postMessage(data); } catch(e) {}
+    },
+    close: () => { try { channel.close(); } catch(e) {} },
+    get open() { return true; },
+    peer: fakePeerId,
+    on: (event, handler) => {
+      if (event === 'data') {
+        channel.addEventListener('message', (e) => {
+          try { handler(e.data); } catch(err) {}
+        });
+      }
+    }
+  };
+
+  connections[fakePeerId] = { conn: broadcastWrapper, username: '' };
+
+  // Handle incoming messages
+  channel.addEventListener('message', (event) => {
+    if (event.data && event.data.type !== 'hello') {
+      try {
+        handleData(event.data, fakePeerId);
+      } catch(e) {
+        console.error('Local channel message error:', e);
+      }
+    }
+  });
+
+  channel.addEventListener('close', () => {
+    showStatus('对方已断开连接', 'error');
+  });
+
+  setTimeout(() => {
+    showStatus('本机连接成功！', 'success');
+    setTimeout(() => enterApp(), 500);
+  }, 800);
+}
+
 // UI toggle for direct connection mode
 function hideAllDCPanels() {
   ['dc-choice-panel', 'dc-create-panel', 'dc-join-panel'].forEach(id => {
@@ -1595,6 +1791,16 @@ function setupDirectConnectUI() {
   });
   document.getElementById('dc-back-to-choice').addEventListener('click', () => showDCPanel('dc-choice-panel'));
   document.getElementById('dc-back-to-choice-2').addEventListener('click', () => showDCPanel('dc-choice-panel'));
+
+  // Local test mode (BroadcastChannel for same-device testing)
+  document.getElementById('local-test-link').addEventListener('click', (e) => {
+    e.preventDefault();
+    myUsername = document.getElementById('username-input').value.trim();
+    if (!myUsername) { showStatus('请先输入昵称', 'error'); return; }
+    selectedName = myUsername;
+    showStatus('正在等待另一个标签页连接...', 'info');
+    startLocalTestMode();
+  });
 
   // Choice buttons
   document.getElementById('dc-choice-create').addEventListener('click', () => {
@@ -1646,11 +1852,16 @@ function setupDirectConnectUI() {
     }
   });
 
-  document.getElementById('dc-offer-input').addEventListener('input', async (e) => {
-    const text = e.target.value.trim();
-    if (text.length > 50 && !dcAnswer) {
-      await dcHandleOffer(text);
-    }
+  document.getElementById('dc-offer-input').addEventListener('input', (e) => {
+    // Debounced auto-trigger: only call dcHandleOffer once after paste settles
+    clearTimeout(window._offerInputTimer);
+    window._offerInputTimer = setTimeout(() => {
+      const text = e.target.value.trim();
+      if (text.length > 50 && !dcAnswer && !window._handlingOffer) {
+        window._handlingOffer = true;
+        dcHandleOffer(text).finally(() => { window._handlingOffer = false; });
+      }
+    }, 300);
   });
 
   document.getElementById('dc-copy-answer-btn').addEventListener('click', () => {
@@ -2128,27 +2339,8 @@ function renderAll() {
 }
 
 /* ============================================================
-   CODE PROTECTION
+   INITIALIZE
    ============================================================ */
-document.addEventListener('contextmenu', e => e.preventDefault());
-document.addEventListener('keydown', e => {
-  if (e.key === 'F12') { e.preventDefault(); return false; }
-  if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i')) { e.preventDefault(); return false; }
-  if (e.ctrlKey && e.shiftKey && (e.key === 'J' || e.key === 'j')) { e.preventDefault(); return false; }
-  if (e.ctrlKey && e.shiftKey && (e.key === 'C' || e.key === 'c')) { e.preventDefault(); return false; }
-  if (e.ctrlKey && (e.key === 'U' || e.key === 'u')) { e.preventDefault(); return false; }
-  if (e.ctrlKey && (e.key === 'S' || e.key === 's')) { e.preventDefault(); return false; }
-});
-// Detect DevTools open (basic heuristic)
-(function() {
-  const threshold = 160;
-  const check = () => {
-    if (window.outerWidth - window.innerWidth > threshold || window.outerHeight - window.innerHeight > threshold) {
-      document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#725D42;background:#F8F8F0;"><div style="text-align:center;"><h2 style="font-size:24px;margin-bottom:8px;">开发者工具已禁用</h2><p style="font-size:14px;color:#9F927D;">本产品禁止查看源代码，请关闭开发者工具后刷新页面</p></div></div>';
-    }
-  };
-  setInterval(check, 1000);
-})();
 
 // Initialize direct connection UI
 (function() {
