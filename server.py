@@ -39,7 +39,6 @@ HTTP_PORT = 9000
 WS_PORT = 9001
 HOST = '0.0.0.0'
 FIXED_ROOM_ID = '暖暖小窝'
-VERIFY_CODE = '小白猪'
 ALLOWED_NAMES = ['大灰狼', '懒洋洋']
 HISTORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'chat_history.json')
 
@@ -203,15 +202,9 @@ async def handle_client(websocket):
 
 async def handle_join(websocket, data):
     username = data.get('username', '').strip()
-    code = data.get('code', '').strip()
 
     if not username:
         await websocket.send(json.dumps({'type': 'error', 'message': '请输入昵称'}))
-        return None
-
-    # 校验码验证
-    if code != VERIFY_CODE:
-        await websocket.send(json.dumps({'type': 'error', 'message': '校验码错误'}))
         return None
 
     # 昵称限制
@@ -407,7 +400,6 @@ async def ws_main():
             print('')
         print(f'  🔌 WebSocket: ws://localhost:{WS_PORT}')
         print('')
-        print(f'  🔑 校验码: {VERIFY_CODE}')
         print('  📝 聊天记录保存到: chat_history.json')
         print(f'  📄 Word 导出: http://localhost:{HTTP_PORT}/api/export')
         print('')
