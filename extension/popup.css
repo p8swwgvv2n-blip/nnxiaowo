@@ -810,3 +810,96 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--kids-muted);
 }
+
+/* ============================================================
+   更新提示横幅
+   ============================================================ */
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #FFF8E1;
+  border-bottom: 1px solid #FFCC00;
+  font-size: 12px;
+  color: var(--kids-title);
+  flex-shrink: 0;
+}
+
+.update-banner span:first-child {
+  flex: 1;
+}
+
+/* ============================================================
+   引用回复样式
+   ============================================================ */
+.msg-quote {
+  background: rgba(0,0,0,0.05);
+  border-left: 3px solid var(--kids-primary);
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--kids-muted);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.msg-quote .quote-author {
+  font-weight: 700;
+  color: var(--kids-title);
+}
+
+.msg-quote-btn {
+  cursor: pointer;
+  margin-left: 6px;
+  opacity: 0.3;
+  transition: opacity 0.2s;
+  font-size: 12px;
+}
+
+.msg-quote-btn:hover {
+  opacity: 1;
+  color: var(--kids-primary);
+}
+
+.quote-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--kids-card);
+  border-top: 1px solid var(--kids-secondary);
+  font-size: 12px;
+}
+
+.quote-bar-content {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quote-bar-author {
+  font-weight: 700;
+  color: var(--kids-title);
+}
+
+.quote-bar-text {
+  color: var(--kids-muted);
+}
+
+.quote-bar-cancel {
+  cursor: pointer;
+  opacity: 0.5;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.quote-bar-cancel:hover {
+  opacity: 1;
+  color: var(--kids-danger);
+}
