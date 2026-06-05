@@ -40,6 +40,7 @@ WS_PORT = 9001
 HOST = '0.0.0.0'
 FIXED_ROOM_ID = '暖暖小窝'
 ALLOWED_NAMES = ['大灰狼', '懒洋洋']
+EXTENSION_VERSION = '1.1.0'
 HISTORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'chat_history.json')
 
 # ============================================================
@@ -56,8 +57,20 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_export()
         elif parsed.path == '/api/history':
             self.handle_history_json()
+        elif parsed.path == '/api/version':
+            self.handle_version()
         else:
             super().do_GET()
+
+    def handle_version(self):
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(json.dumps({
+            'version': EXTENSION_VERSION,
+            'update_url': '/extension/'
+        }).encode('utf-8'))
 
     def handle_history_json(self):
         self.send_response(200)
