@@ -279,6 +279,14 @@ async def handle_message(websocket, username, data):
             'time': datetime.now().isoformat(),
             'read': False
         }
+
+        # 端到端加密字段透传
+        if data.get('encrypted'):
+            msg['encrypted'] = True
+            msg['ciphertext'] = data.get('ciphertext', '')
+            msg['iv'] = data.get('iv', '')
+            msg['text'] = '🔒 加密消息'  # 服务端只看到占位文本
+
         room_state['chat_history'][chat_key].append(msg)
         save_history()
 
@@ -290,6 +298,30 @@ async def handle_message(websocket, username, data):
             await broadcast({'type': 'chat', 'message': msg}, exclude=websocket)
 
         await websocket.send(json.dumps({'type': 'chat-receipt', 'msg_id': msg_id}))
+
+    elif msg_type == 'e2ee-key-offer':
+        # 密钥交换请求：A -> Server -> B
+        to_user = data.get('to_user')
+        if to_user:
+            target_ws = members.get(to_user)
+            if target_ws:
+                await target_ws.send(json.dumps({
+                    'type': 'e2ee-key-offer',
+                    'from': username,
+                    'public_key': data.get('public_key', '')
+                }))
+
+    elif msg_type == 'e2ee-key-answer':
+        # 密钥交换回复：B -> Server -> A
+        to_user = data.get('to_user')
+        if to_user:
+            target_ws = members.get(to_user)
+            if target_ws:
+                await target_ws.send(json.dumps({
+                    'type': 'e2ee-key-answer',
+                    'from': username,
+                    'public_key': data.get('public_key', '')
+                }))
 
     elif msg_type == 'chat-read':
         # 已读回执
