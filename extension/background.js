@@ -8,28 +8,70 @@ let currentUsername = '';
 let serverHttpUrl = '';
 let serverWsUrl = '';
 let unreadCount = 0;
-let roomState = null; // 保存房间状态
+let roomState = null;
 let lanIps = [];
+let isReconnecting = false;
 
+// ============================================================
+// 保持 Service Worker 存活 (Manifest V3 会杀死空闲的 SW)
+// ============================================================
+chrome.alarms.create('keepalive', { periodInMinutes: 0.5 }); // 每30秒
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'keepalive') {
+    // 发送 WebSocket ping 保持连接
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      try { ws.send('ping'); } catch(e) {}
+    } else if (!isReconnecting && currentUsername && serverWsUrl) {
+      // WebSocket 已断开，尝试自动重连
+      autoReconnect();
+    }
+  }
+});
+
+// ============================================================
+// 自动重连
+// ============================================================
+async function autoReconnect() {
+  if (isReconnecting || !currentUsername || !serverWsUrl) return;
+  isReconnecting = true;
+
+  try {
+    await connectWS(serverWsUrl, currentUsername);
+    // 重连成功后请求完整状态同步
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'sync-request' }));
+    }
+  } catch(e) {
+    console.error('自动重连失败:', e);
+  } finally {
+    isReconnecting = false;
+  }
+}
+
+// ============================================================
 // 监听来自 popup 的消息
+// ============================================================
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'connect') {
     serverWsUrl = msg.serverUrl;
     serverHttpUrl = msg.serverUrl.replace('ws://', 'http://').replace(/:\d+$/, ':9000');
     connectWS(msg.serverUrl, msg.username)
       .then(() => {
-        // 保存会话
         chrome.storage.local.set({
           session: { username: msg.username, serverUrl: msg.serverUrl }
         });
         checkForUpdate();
+        // 请求状态同步
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'sync-request' }));
+        }
         sendResponse({ success: true });
       })
       .catch(e => sendResponse({ success: false, error: e.message }));
     return true;
   } else if (msg.type === 'disconnect') {
     disconnectWS();
-    // 清除会话
     chrome.storage.local.remove('session');
     sendResponse({ success: true });
   } else if (msg.type === 'ws-send') {
@@ -42,7 +84,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     chrome.action.setBadgeText({ text: '' });
     sendResponse({ success: true });
   } else if (msg.type === 'get-session') {
-    // 返回当前会话状态
     const isConnected = ws && ws.readyState === WebSocket.OPEN;
     sendResponse({
       isConnected: isConnected,
@@ -53,25 +94,34 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       unreadCount: unreadCount
     });
   } else if (msg.type === 'reconnect') {
-    // 从保存的会话恢复连接
-    chrome.storage.local.get(['session'], (result) => {
+    chrome.storage.local.get(['session'], async (result) => {
       if (result.session && result.session.username && result.session.serverUrl) {
         serverWsUrl = result.session.serverUrl;
         serverHttpUrl = result.session.serverUrl.replace('ws://', 'http://').replace(/:\d+$/, ':9000');
-        connectWS(result.session.serverUrl, result.session.username)
-          .then(() => {
-            checkForUpdate();
-            sendResponse({ success: true, session: result.session });
-          })
-          .catch(e => sendResponse({ success: false, error: e.message }));
+        try {
+          await connectWS(result.session.serverUrl, result.session.username);
+          checkForUpdate();
+          // 请求状态同步
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'sync-request' }));
+          }
+          sendResponse({ success: true, session: result.session });
+        } catch(e) {
+          sendResponse({ success: false, error: e.message });
+        }
       } else {
         sendResponse({ success: false, error: '无保存的会话' });
       }
     });
     return true;
+  } else if (msg.type === 'get-badge') {
+    sendResponse({ count: unreadCount });
   }
 });
 
+// ============================================================
+// WebSocket 连接
+// ============================================================
 async function connectWS(serverUrl, username) {
   return new Promise((resolve, reject) => {
     if (ws) {
@@ -81,8 +131,6 @@ async function connectWS(serverUrl, username) {
 
     currentUsername = username;
     unreadCount = 0;
-    roomState = null;
-    lanIps = [];
     chrome.action.setBadgeText({ text: '' });
 
     try {
@@ -112,6 +160,15 @@ async function connectWS(serverUrl, username) {
           if (roomState) {
             roomState.members = data.members || [];
           }
+        } else if (data.type === 'sync') {
+          // 完整状态同步
+          if (data.state) {
+            roomState = {
+              members: data.members || [],
+              state: data.state,
+              lan_ips: lanIps
+            };
+          }
         }
 
         // 聊天消息增加角标
@@ -139,10 +196,15 @@ async function connectWS(serverUrl, username) {
     };
 
     ws.onclose = () => {
-      roomState = null;
+      // 不清除 roomState，等待重连
       chrome.runtime.sendMessage({
         type: 'ws-disconnected'
       }).catch(() => {});
+
+      // 自动重连（如果不是手动断开）
+      if (!isReconnecting && currentUsername && serverWsUrl) {
+        setTimeout(() => autoReconnect(), 3000);
+      }
     };
 
     setTimeout(() => {
@@ -160,13 +222,17 @@ function disconnectWS() {
     ws = null;
   }
   currentUsername = '';
+  serverWsUrl = '';
+  serverHttpUrl = '';
   roomState = null;
   lanIps = [];
   unreadCount = 0;
   chrome.action.setBadgeText({ text: '' });
 }
 
-// 语义化版本比较：返回 -1 (v1<v2), 0 (相等), 1 (v1>v2)
+// ============================================================
+// 版本检查
+// ============================================================
 function compareVersion(v1, v2) {
   const parts1 = v1.split('.').map(Number);
   const parts2 = v2.split('.').map(Number);
@@ -188,7 +254,6 @@ async function checkForUpdate() {
     const data = await response.json();
     const currentVersion = chrome.runtime.getManifest().version;
 
-    // 只在服务器版本 > 本地版本时提示更新
     if (data.version && compareVersion(currentVersion, data.version) < 0) {
       chrome.runtime.sendMessage({
         type: 'update-available',
