@@ -176,7 +176,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   } else if (msg.type === 'ws-error') {
     showStatus(msg.error, 'error');
   } else if (msg.type === 'ws-disconnected') {
-    showStatus('服务器连接断开', 'error');
+    // 不立即显示断开提示，等待自动重连
+    // 3秒后如果仍未连接则显示提示
+    setTimeout(() => {
+      chrome.runtime.sendMessage({ type: 'get-session' }, (session) => {
+        if (session && !session.isConnected) {
+          showStatus('服务器连接断开，正在重连...', 'error');
+        }
+      });
+    }, 3000);
   } else if (msg.type === 'update-available') {
     showUpdateBanner(msg.currentVersion, msg.newVersion, msg.updateUrl);
   }
@@ -312,6 +320,20 @@ function handleMessage(data) {
     case 'kicked':
       showStatus(data.message || '你已在其他设备登录', 'error');
       setTimeout(disconnect, 2000);
+      break;
+
+    case 'sync':
+      // 完整状态同步（重连后恢复历史）
+      if (data.state) {
+        chatHistory = data.state.chat_history || {};
+        todos = data.state.todos || [];
+        foods = data.state.foods || foods;
+      }
+      if (data.members) {
+        members = data.members;
+        updateMemberCount();
+      }
+      renderAll();
       break;
 
     case 'error':
@@ -701,6 +723,9 @@ function playNotificationSound() {
 // 初始化
 // ============================================================
 (function() {
+  // 打开插件时清除角标
+  chrome.runtime.sendMessage({ type: 'clear-badge' });
+
   // 检查是否有保存的会话，自动恢复
   chrome.runtime.sendMessage({ type: 'get-session' }, (session) => {
     if (session && session.isConnected && session.username) {
