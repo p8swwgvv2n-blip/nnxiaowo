@@ -40,7 +40,7 @@ WS_PORT = 9001
 HOST = '0.0.0.0'
 FIXED_ROOM_ID = '暖暖小窝'
 ALLOWED_NAMES = ['大灰狼', '懒洋洋']
-EXTENSION_VERSION = '1.1.0'
+EXTENSION_VERSION = '1.1.1'
 HISTORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'chat_history.json')
 
 # ============================================================
@@ -59,6 +59,10 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_history_json()
         elif parsed.path == '/api/version':
             self.handle_version()
+        elif parsed.path == '/extension/' or parsed.path == '/extension':
+            self.handle_extension_page()
+        elif parsed.path == '/extension/extension.zip':
+            self.handle_extension_download()
         else:
             super().do_GET()
 
@@ -71,6 +75,75 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             'version': EXTENSION_VERSION,
             'update_url': '/extension/'
         }).encode('utf-8'))
+
+    def handle_extension_page(self):
+        # 插件更新页面
+        html = f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>暖暖小窝 - 插件更新</title>
+  <style>
+    * {{ margin:0; padding:0; box-sizing:border-box; }}
+    body {{ font-family:'Nunito',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#F8F8F0; color:#794F27; display:flex; align-items:center; justify-content:center; min-height:100vh; }}
+    .card {{ background:#F7F3DF; border-radius:24px; padding:40px; max-width:480px; width:90%; text-align:center; box-shadow:0 8px 32px rgba(0,0,0,0.1); }}
+    .icon {{ width:64px; height:64px; margin:0 auto 20px; background:#19C8B9; border-radius:50%; display:flex; align-items:center; justify-content:center; }}
+    .icon svg {{ width:32px; height:32px; stroke:white; fill:none; stroke-width:2; }}
+    h1 {{ font-size:24px; margin-bottom:8px; font-weight:700; }}
+    .version {{ color:#19C8B9; font-size:14px; font-weight:700; margin-bottom:16px; }}
+    p {{ color:#725D42; font-size:14px; line-height:1.6; margin-bottom:24px; }}
+    .btn {{ display:inline-block; padding:14px 32px; background:#19C8B9; color:white; text-decoration:none; border-radius:50px; font-weight:700; font-size:16px; box-shadow:0 5px 0 0 #0EA89B; transition:all 0.15s; }}
+    .btn:hover {{ transform:translateY(-2px); box-shadow:0 7px 0 0 #0EA89B; }}
+    .btn:active {{ transform:translateY(2px); box-shadow:0 3px 0 0 #0EA89B; }}
+    .steps {{ text-align:left; margin-top:24px; padding:16px; background:rgba(0,0,0,0.03); border-radius:16px; }}
+    .steps h3 {{ font-size:14px; margin-bottom:12px; color:#794F27; }}
+    .steps ol {{ padding-left:20px; font-size:13px; color:#725D42; line-height:1.8; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    </div>
+    <h1>暖暖小窝</h1>
+    <div class="version">最新版本 v{EXTENSION_VERSION}</div>
+    <p>下载最新的浏览器插件安装包，解压后在浏览器扩展页面重新加载即可。</p>
+    <a class="btn" href="/extension/extension.zip" download>下载插件</a>
+    <div class="steps">
+      <h3>安装步骤</h3>
+      <ol>
+        <li>下载并解压 ZIP 文件</li>
+        <li>打开 <code>chrome://extensions/</code>（夸克浏览器：<code>quark://extensions/</code>）</li>
+        <li>开启右上角「开发者模式」</li>
+        <li>点击「加载已解压的扩展程序」</li>
+        <li>选择解压后的文件夹</li>
+      </ol>
+    </div>
+  </div>
+</body>
+</html>"""
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.end_headers()
+        self.wfile.write(html.encode('utf-8'))
+
+    def handle_extension_download(self):
+        # 从 extension 目录读取 ZIP 文件
+        zip_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'extension.zip')
+        if os.path.exists(zip_path):
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/zip')
+            self.send_header('Content-Disposition', 'attachment; filename="extension.zip"')
+            self.send_header('Content-Length', str(os.path.getsize(zip_path)))
+            self.end_headers()
+            with open(zip_path, 'rb') as f:
+                self.wfile.write(f.read())
+        else:
+            self.send_response(404)
+            self.send_header('Content-Type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(b'extension.zip not found')
 
     def handle_history_json(self):
         self.send_response(200)
