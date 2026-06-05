@@ -667,15 +667,8 @@ main {
       <input class="input" type="text" id="username-input" placeholder="输入你的昵称..." maxlength="12" autocomplete="off" />
     </div>
 
-    <div class="login-divider">房间</div>
-
     <div class="login-actions">
-      <button class="btn btn-primary" id="create-room-btn">创建新房间</button>
-      <div style="text-align:center;font-size:12px;color:var(--kids-muted);">或加入已有房间</div>
-      <div style="display:flex;gap:8px;">
-        <input class="input" type="text" id="join-room-input" placeholder="输入房间码..." maxlength="12" style="flex:1;text-transform:uppercase;" />
-        <button class="btn btn-secondary" id="join-room-btn">加入</button>
-      </div>
+      <button class="btn btn-primary" id="enter-btn">进入</button>
     </div>
 
     <div class="server-info" id="server-info">
@@ -685,13 +678,8 @@ main {
 
     <div class="login-status" id="login-status"></div>
 
-    <div class="room-code-display" id="room-code-display" style="display:none;" title="点击复制">
-      <div class="room-code-label">你的房间码（分享给好友）</div>
-      <div class="room-code-value" id="room-code-value"></div>
-    </div>
-
     <div class="login-footer">
-      <div class="version">v3.0.0 · 2026.06.04</div>
+      <div class="version">v3.1.0 · 2026.06.05</div>
       <div class="developer">开发人：小石头</div>
       <div class="copyright">本产品受知识产权保护</div>
     </div>
@@ -701,10 +689,10 @@ main {
 <!-- APP SHELL -->
 <div class="app-shell" id="app-shell">
   <div class="room-info-bar">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-    端到端加密 · 房间 <span class="room-id" id="room-id-display"></span>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    暖暖小窝
     <span class="member-count" id="member-count">1 人在线</span>
-    <button class="leave-btn" id="leave-room-btn">离开房间</button>
+    <button class="leave-btn" id="leave-room-btn">退出</button>
   </div>
 
   <main>
@@ -827,7 +815,6 @@ const WS_URL = `ws://${window.location.hostname}:9001`;
 let ws = null;
 let myUsername = '';
 let roomId = '';
-let isHost = false;
 let members = [];
 let chatHistory = {};
 let todos = [];
@@ -839,7 +826,6 @@ const avatarColors = ['var(--tile-pink)','var(--tile-purple)','var(--tile-blue)'
 function getColor(name) { let h=0; for(let i=0;i<name.length;i++) h=name.charCodeAt(i)+((h<<5)-h); return avatarColors[Math.abs(h)%avatarColors.length]; }
 function getInitial(name) { return name.charAt(0); }
 function formatTime(d) { const h=d.getHours().toString().padStart(2,'0'); const m=d.getMinutes().toString().padStart(2,'0'); return h+':'+m; }
-function genRoomId() { const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let r=''; for(let i=0;i<6;i++) r+=chars[Math.floor(Math.random()*chars.length)]; return r; }
 
 function showStatus(msg, type) {
   const el = document.getElementById('login-status');
@@ -893,17 +879,8 @@ function send(data) {
    ============================================================ */
 function handleMessage(data) {
   switch(data.type) {
-    case 'room-created':
-      roomId = data.room_id;
-      isHost = true;
-      document.getElementById('room-code-display').style.display = 'block';
-      document.getElementById('room-code-value').textContent = roomId;
-      showStatus('房间已创建！等待好友加入...', 'success');
-      break;
-
     case 'room-joined':
       roomId = data.room_id;
-      isHost = false;
       members = data.members || [];
       if (data.state) {
         chatHistory = data.state.chat_history || {};
@@ -977,6 +954,11 @@ function handleMessage(data) {
       renderAll();
       break;
 
+    case 'kicked':
+      showStatus(data.message || '你已在其他设备登录', 'error');
+      setTimeout(() => { leaveRoom(); }, 2000);
+      break;
+
     case 'error':
       showStatus(data.message || '发生错误', 'error');
       break;
@@ -990,34 +972,21 @@ function getChatKey(a, b) {
 /* ============================================================
    房间操作
    ============================================================ */
-function createRoom() {
-  myUsername = document.getElementById('username-input').value.trim();
-  if (!myUsername) { showStatus('请先输入昵称', 'error'); return; }
-  if (!ws || ws.readyState !== WebSocket.OPEN) { showStatus('正在连接服务器，请稍后再试', 'error'); return; }
-
-  roomId = genRoomId();
-  send({ type: 'create-room', room_id: roomId, username: myUsername });
-}
-
 function joinRoom() {
   myUsername = document.getElementById('username-input').value.trim();
-  const code = document.getElementById('join-room-input').value.trim().toUpperCase();
 
   if (!myUsername) { showStatus('请先输入昵称', 'error'); return; }
-  if (!code) { showStatus('请输入房间码', 'error'); return; }
   if (!ws || ws.readyState !== WebSocket.OPEN) { showStatus('正在连接服务器，请稍后再试', 'error'); return; }
 
-  send({ type: 'join-room', room_id: code, username: myUsername });
+  send({ type: 'join', username: myUsername });
 }
 
 function leaveRoom() {
-  send({ type: 'leave', room_id: roomId, username: myUsername });
+  send({ type: 'leave', username: myUsername });
   ws.close();
   document.getElementById('app-shell').classList.remove('active');
   document.getElementById('login-page').style.display = 'flex';
-  document.getElementById('room-code-display').style.display = 'none';
   document.getElementById('username-input').value = '';
-  document.getElementById('join-room-input').value = '';
   clearStatus();
   roomId = '';
   members = [];
@@ -1032,7 +1001,6 @@ function leaveRoom() {
 function enterApp() {
   document.getElementById('login-page').style.display = 'none';
   document.getElementById('app-shell').classList.add('active');
-  document.getElementById('room-id-display').textContent = roomId;
   updateMemberCount();
   renderAll();
 }
@@ -1293,22 +1261,12 @@ function renderAll() {
   // 连接 WebSocket
   connectWS();
 
-  // 创建房间
-  document.getElementById('create-room-btn').addEventListener('click', createRoom);
-
-  // 加入房间
-  document.getElementById('join-room-btn').addEventListener('click', joinRoom);
-  document.getElementById('join-room-input').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoom(); });
+  // 进入按钮
+  document.getElementById('enter-btn').addEventListener('click', joinRoom);
+  document.getElementById('username-input').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoom(); });
 
   // 离开房间
   document.getElementById('leave-room-btn').addEventListener('click', leaveRoom);
-
-  // 房间码复制
-  document.getElementById('room-code-display').addEventListener('click', () => {
-    navigator.clipboard.writeText(roomId).then(() => {
-      showStatus('房间码已复制！', 'success');
-    }).catch(() => {});
-  });
 
   // 标签页切换
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1363,9 +1321,6 @@ function renderAll() {
     document.getElementById('food-input').value = '';
   });
   document.getElementById('food-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('food-add-btn').click(); });
-
-  // 用户名回车
-  document.getElementById('username-input').addEventListener('keydown', e => { if (e.key === 'Enter') createRoom(); });
 })();
 </script>
 </body>
