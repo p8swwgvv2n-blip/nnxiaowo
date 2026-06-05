@@ -709,6 +709,7 @@ main {
     暖暖小窝
     <span class="member-count" id="member-count">1 人在线</span>
     <button class="btn btn-secondary" id="export-btn" style="padding:4px 12px;font-size:12px;margin-right:8px;">导出聊天</button>
+    <span id="lan-ip-display" style="display:none;font-size:12px;color:var(--kids-muted);margin-right:8px;"></span>
     <button class="leave-btn" id="leave-room-btn">退出</button>
   </div>
 
@@ -921,6 +922,14 @@ function handleMessage(data) {
         todos = data.state.todos || [];
         foods = data.state.foods || foods;
       }
+      // 显示本机IP
+      if (data.lan_ips && data.lan_ips.length > 0) {
+        const ipBar = document.getElementById('lan-ip-display');
+        if (ipBar) {
+          ipBar.textContent = '本机IP: ' + data.lan_ips.filter(ip => !ip.startsWith('127.')).join(' / ');
+          ipBar.style.display = 'inline';
+        }
+      }
       enterApp();
       break;
 
@@ -1039,6 +1048,7 @@ function leaveRoom() {
   document.getElementById('app-shell').classList.remove('active');
   document.getElementById('login-page').style.display = 'flex';
   document.getElementById('username-input').value = '';
+  document.getElementById('lan-ip-display').style.display = 'none';
   clearStatus();
   roomId = '';
   members = [];
