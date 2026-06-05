@@ -839,6 +839,72 @@ let todos = [];
 let foods = ['黄焖鸡', '麻辣烫', '牛肉面', '寿司', '炸鸡', '沙拉', '饺子', '螺蛳粉'];
 let currentChat = null;
 let todoFilter = 'all';
+let quoteMsg = null;
+
+// ============================================================
+// 端到端加密 (E2EE) 模块
+// 使用 ECDH 密钥交换 + AES-GCM 对称加密
+// ============================================================
+const e2ee = {
+  myKeyPair: null,
+  sharedKeys: {},
+
+  async generateKeyPair() {
+    this.myKeyPair = await crypto.subtle.generateKey(
+      { name: 'ECDH', namedCurve: 'P-256' },
+      true,
+      ['deriveKey']
+    );
+  },
+
+  async exportPublicKey() {
+    const exported = await crypto.subtle.exportKey('raw', this.myKeyPair.publicKey);
+    return btoa(String.fromCharCode(...new Uint8Array(exported)));
+  },
+
+  async deriveSharedKey(peerPublicKeyB64, chatKey) {
+    if (this.sharedKeys[chatKey]) return this.sharedKeys[chatKey];
+    const peerPublicKeyBytes = Uint8Array.from(atob(peerPublicKeyB64), c => c.charCodeAt(0));
+    const peerPublicKey = await crypto.subtle.importKey(
+      'raw', peerPublicKeyBytes,
+      { name: 'ECDH', namedCurve: 'P-256' },
+      false, []
+    );
+    const sharedKey = await crypto.subtle.deriveKey(
+      { name: 'ECDH', public: peerPublicKey },
+      this.myKeyPair.privateKey,
+      { name: 'AES-GCM', length: 256 },
+      true, ['encrypt', 'decrypt']
+    );
+    this.sharedKeys[chatKey] = sharedKey;
+    return sharedKey;
+  },
+
+  async encrypt(plainText, chatKey) {
+    const key = this.sharedKeys[chatKey];
+    if (!key) throw new Error('未建立加密密钥');
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encoded = new TextEncoder().encode(plainText);
+    const cipherBuffer = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: iv }, key, encoded
+    );
+    return {
+      ciphertext: btoa(String.fromCharCode(...new Uint8Array(cipherBuffer))),
+      iv: btoa(String.fromCharCode(...iv))
+    };
+  },
+
+  async decrypt(ciphertextB64, ivB64, chatKey) {
+    const key = this.sharedKeys[chatKey];
+    if (!key) throw new Error('未建立加密密钥');
+    const cipherBytes = Uint8Array.from(atob(ciphertextB64), c => c.charCodeAt(0));
+    const ivBytes = Uint8Array.from(atob(ivB64), c => c.charCodeAt(0));
+    const plainBuffer = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: ivBytes }, key, cipherBytes
+    );
+    return new TextDecoder().decode(plainBuffer);
+  }
+};
 
 const avatarColors = ['var(--tile-pink)','var(--tile-purple)','var(--tile-blue)','var(--tile-orange)','var(--tile-teal)','var(--tile-red)','var(--tile-green)','var(--tile-yellow)'];
 function getColor(name) { let h=0; for(let i=0;i<name.length;i++) h=name.charCodeAt(i)+((h<<5)-h); return avatarColors[Math.abs(h)%avatarColors.length]; }
@@ -945,17 +1011,47 @@ function handleMessage(data) {
       renderContacts();
       break;
 
+    case 'e2ee-key-offer':
+      (async () => {
+        const peerName = data.from;
+        const chatKey = getChatKey(myUsername, peerName);
+        await e2ee.deriveSharedKey(data.public_key, chatKey);
+        const myPub = await e2ee.exportPublicKey();
+        ws.send(JSON.stringify({ type: 'e2ee-key-answer', public_key: myPub, to_user: peerName }));
+      })();
+      break;
+
+    case 'e2ee-key-answer':
+      (async () => {
+        const peerName = data.from;
+        const chatKey = getChatKey(myUsername, peerName);
+        await e2ee.deriveSharedKey(data.public_key, chatKey);
+      })();
+      break;
+
     case 'chat':
-      const msg = data.message;
-      const ck = getChatKey(msg.from, msg.to);
-      if (!chatHistory[ck]) chatHistory[ck] = [];
-      chatHistory[ck].push(msg);
-      if (currentChat && (msg.from === currentChat || msg.to === currentChat)) {
-        renderMessages();
-      }
-      renderContacts();
-      // 收到消息提示音
-      if (msg.to === myUsername) playNotificationSound();
+      (async () => {
+        const msg = data.message;
+        const ck = getChatKey(msg.from, msg.to);
+        if (msg.encrypted && msg.ciphertext && msg.iv) {
+          try {
+            const plainText = await e2ee.decrypt(msg.ciphertext, msg.iv, ck);
+            const parsed = JSON.parse(plainText);
+            msg.text = parsed.text || '';
+            msg.quote = parsed.quote || null;
+            msg.encrypted = false;
+          } catch(e) {
+            msg.text = '🔒 无法解密此消息';
+          }
+        }
+        if (!chatHistory[ck]) chatHistory[ck] = [];
+        chatHistory[ck].push(msg);
+        if (currentChat && (msg.from === currentChat || msg.to === currentChat)) {
+          renderMessages();
+        }
+        renderContacts();
+        if (msg.to === myUsername) playNotificationSound();
+      })();
       break;
 
     case 'chat-receipt':
@@ -1060,7 +1156,7 @@ function leaveRoom() {
 /* ============================================================
    进入应用
    ============================================================ */
-function enterApp() {
+async function enterApp() {
   document.getElementById('login-page').style.display = 'none';
   document.getElementById('app-shell').classList.add('active');
 
@@ -1069,6 +1165,13 @@ function enterApp() {
 
   updateMemberCount();
   renderAll();
+
+  // 生成 ECDH 密钥对
+  await e2ee.generateKeyPair();
+
+  // 广播公钥给所有在线成员
+  const pubKey = await e2ee.exportPublicKey();
+  ws.send(JSON.stringify({ type: 'e2ee-key-offer', public_key: pubKey }));
 }
 
 function updateMemberCount() {
@@ -1179,9 +1282,9 @@ function markAsRead() {
 }
 
 /* ============================================================
-   发送消息
+   发送消息 (端到端加密)
    ============================================================ */
-function sendChat() {
+async function sendChat() {
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
   if (!text || !currentChat) return;
@@ -1202,13 +1305,27 @@ function sendChat() {
   renderMessages();
   renderContacts();
 
-  // 再发送到服务器
-  send({
+  // 尝试加密发送
+  const sendData = {
     type: 'chat',
     msg_id: msgId,
-    text: text,
     to_user: currentChat
-  });
+  };
+
+  const sharedKey = e2ee.sharedKeys[chatKey];
+  if (sharedKey) {
+    const encrypted = await e2ee.encrypt(JSON.stringify({ text: text }), chatKey);
+    sendData.encrypted = true;
+    sendData.ciphertext = encrypted.ciphertext;
+    sendData.iv = encrypted.iv;
+  } else {
+    sendData.text = text;
+    // 触发密钥交换
+    const myPub = await e2ee.exportPublicKey();
+    ws.send(JSON.stringify({ type: 'e2ee-key-offer', public_key: myPub, to_user: currentChat }));
+  }
+
+  send(sendData);
 
   input.value = '';
   input.style.height = 'auto';
