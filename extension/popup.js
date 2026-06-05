@@ -290,7 +290,10 @@ function handleMessage(data) {
       break;
 
     case 'todo-added':
-      todos.push(data.todo);
+      // 避免重复添加（乐观更新可能已存在）
+      if (!todos.find(t => t.id === data.todo.id)) {
+        todos.push(data.todo);
+      }
       renderTodos();
       break;
 
@@ -390,9 +393,22 @@ function renderAll() {
 function renderContacts() {
   const list = document.getElementById('contact-list');
   const search = document.getElementById('contact-search-input').value.toLowerCase();
-  const others = members.filter(m => m !== myUsername).filter(m => !search || m.toLowerCase().includes(search));
 
-  list.innerHTML = others.map(name => {
+  // 合并在线成员和历史聊天记录中的联系人
+  const allContacts = new Set();
+  members.filter(m => m !== myUsername).forEach(m => allContacts.add(m));
+  // 从聊天历史中提取联系人
+  Object.keys(chatHistory).forEach(key => {
+    const parts = key.split('<->');
+    if (parts.length === 2) {
+      const other = parts[0] === myUsername ? parts[1] : parts[1] === myUsername ? parts[0] : null;
+      if (other) allContacts.add(other);
+    }
+  });
+
+  const contacts = Array.from(allContacts).filter(name => !search || name.toLowerCase().includes(search));
+
+  list.innerHTML = contacts.map(name => {
     const chatKey = getChatKey(myUsername, name);
     const msgs = chatHistory[chatKey] || [];
     const last = msgs[msgs.length - 1];
@@ -601,12 +617,19 @@ function renderTodos() {
 
   list.querySelectorAll('.todo-checkbox').forEach(cb => {
     cb.addEventListener('click', () => {
+      // 乐观更新
+      const todo = todos.find(t => t.id === cb.dataset.id);
+      if (todo) todo.done = !todo.done;
+      renderTodos();
       send({ type: 'todo-toggle', id: cb.dataset.id });
     });
   });
 
   list.querySelectorAll('.todo-delete').forEach(btn => {
     btn.addEventListener('click', () => {
+      // 乐观更新
+      todos = todos.filter(t => t.id !== btn.dataset.id);
+      renderTodos();
       send({ type: 'todo-delete', id: btn.dataset.id });
     });
   });
@@ -794,6 +817,28 @@ function playNotificationSound() {
   });
   document.getElementById('send-btn').addEventListener('click', sendChat);
 
+  // 表情面板
+  const emojis = ['😊','😂','❤️','👍','🎉','🔥','😎','🥰','😘','🤔','😢','😡','👏','💪','🙏','🎈','🌟','💯','😋','🤣','😍','🤗','😴','🤯','🥳','😇','🙄','😏','😬','🤝','👀','💕','🌈','☀️','🍕','🍔','☕','🎵','📱','💻'];
+  const emojiPanel = document.getElementById('emoji-panel');
+  emojiPanel.innerHTML = emojis.map(e => `<span class="emoji-item">${e}</span>`).join('');
+
+  document.getElementById('emoji-btn').addEventListener('click', () => {
+    emojiPanel.style.display = emojiPanel.style.display === 'none' ? 'grid' : 'none';
+  });
+
+  emojiPanel.querySelectorAll('.emoji-item').forEach(item => {
+    item.addEventListener('click', () => {
+      chatInput.value += item.textContent;
+      chatInput.focus();
+      chatInput.dispatchEvent(new Event('input'));
+    });
+  });
+
+  // 点击聊天区域关闭表情面板
+  document.getElementById('chat-messages').addEventListener('click', () => {
+    emojiPanel.style.display = 'none';
+  });
+
   // 联系人搜索
   document.getElementById('contact-search-input').addEventListener('input', renderContacts);
 
@@ -803,9 +848,13 @@ function playNotificationSound() {
     const priority = document.getElementById('todo-priority').value;
     const text = input.value.trim();
     if (!text) return;
+    const todo = { id: 'todo-' + Date.now(), text: text, priority: priority, done: false };
+    // 乐观更新：先添加到本地并渲染
+    todos.push(todo);
+    renderTodos();
     send({
       type: 'todo-add',
-      todo: { id: 'todo-' + Date.now(), text: text, priority: priority, done: false }
+      todo: todo
     });
     input.value = '';
   });
