@@ -1,19 +1,27 @@
 /* ============================================================
    暖暖小窝 - Background Service Worker
-   管理 WebSocket 连接、自动更新、角标计数
+   管理 WebSocket 连接、自动更新、角标计数、会话保持
    ============================================================ */
 
 let ws = null;
 let currentUsername = '';
 let serverHttpUrl = '';
+let serverWsUrl = '';
 let unreadCount = 0;
+let roomState = null; // 保存房间状态
+let lanIps = [];
 
 // 监听来自 popup 的消息
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'connect') {
+    serverWsUrl = msg.serverUrl;
     serverHttpUrl = msg.serverUrl.replace('ws://', 'http://').replace(/:\d+$/, ':9000');
     connectWS(msg.serverUrl, msg.username)
       .then(() => {
+        // 保存会话
+        chrome.storage.local.set({
+          session: { username: msg.username, serverUrl: msg.serverUrl }
+        });
         checkForUpdate();
         sendResponse({ success: true });
       })
@@ -21,6 +29,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   } else if (msg.type === 'disconnect') {
     disconnectWS();
+    // 清除会话
+    chrome.storage.local.remove('session');
     sendResponse({ success: true });
   } else if (msg.type === 'ws-send') {
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -31,8 +41,34 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     unreadCount = 0;
     chrome.action.setBadgeText({ text: '' });
     sendResponse({ success: true });
-  } else if (msg.type === 'get-unread') {
-    sendResponse({ count: unreadCount });
+  } else if (msg.type === 'get-session') {
+    // 返回当前会话状态
+    const isConnected = ws && ws.readyState === WebSocket.OPEN;
+    sendResponse({
+      isConnected: isConnected,
+      username: currentUsername,
+      serverUrl: serverWsUrl,
+      members: roomState ? roomState.members : [],
+      lanIps: lanIps,
+      unreadCount: unreadCount
+    });
+  } else if (msg.type === 'reconnect') {
+    // 从保存的会话恢复连接
+    chrome.storage.local.get(['session'], (result) => {
+      if (result.session && result.session.username && result.session.serverUrl) {
+        serverWsUrl = result.session.serverUrl;
+        serverHttpUrl = result.session.serverUrl.replace('ws://', 'http://').replace(/:\d+$/, ':9000');
+        connectWS(result.session.serverUrl, result.session.username)
+          .then(() => {
+            checkForUpdate();
+            sendResponse({ success: true, session: result.session });
+          })
+          .catch(e => sendResponse({ success: false, error: e.message }));
+      } else {
+        sendResponse({ success: false, error: '无保存的会话' });
+      }
+    });
+    return true;
   }
 });
 
@@ -45,6 +81,8 @@ async function connectWS(serverUrl, username) {
 
     currentUsername = username;
     unreadCount = 0;
+    roomState = null;
+    lanIps = [];
     chrome.action.setBadgeText({ text: '' });
 
     try {
@@ -65,6 +103,16 @@ async function connectWS(serverUrl, username) {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+
+        // 保存房间状态
+        if (data.type === 'room-joined') {
+          roomState = data;
+          lanIps = data.lan_ips || [];
+        } else if (data.type === 'member-joined' || data.type === 'member-left') {
+          if (roomState) {
+            roomState.members = data.members || [];
+          }
+        }
 
         // 聊天消息增加角标
         if (data.type === 'chat' && data.message && data.message.to === currentUsername) {
@@ -91,6 +139,7 @@ async function connectWS(serverUrl, username) {
     };
 
     ws.onclose = () => {
+      roomState = null;
       chrome.runtime.sendMessage({
         type: 'ws-disconnected'
       }).catch(() => {});
@@ -111,6 +160,8 @@ function disconnectWS() {
     ws = null;
   }
   currentUsername = '';
+  roomState = null;
+  lanIps = [];
   unreadCount = 0;
   chrome.action.setBadgeText({ text: '' });
 }
