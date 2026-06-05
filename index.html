@@ -1116,6 +1116,22 @@ function sendChat() {
   if (!text || !currentChat) return;
 
   const msgId = 'msg-' + Date.now();
+  const msg = {
+    id: msgId,
+    from: myUsername,
+    to: currentChat,
+    text: text,
+    time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  };
+
+  // 先添加到本地历史（即时显示）
+  const chatKey = getChatKey(myUsername, currentChat);
+  if (!chatHistory[chatKey]) chatHistory[chatKey] = [];
+  chatHistory[chatKey].push(msg);
+  renderMessages();
+  renderContacts();
+
+  // 再发送到服务器
   send({
     type: 'chat',
     msg_id: msgId,
