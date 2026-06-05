@@ -216,7 +216,7 @@ async def handle_join(websocket, data):
 
     # 昵称限制
     if username not in ALLOWED_NAMES:
-        await websocket.send(json.dumps({'type': 'error', 'message': '该昵称暂未开放，请使用「大灰狼」或「懒洋洋」'}))
+        await websocket.send(json.dumps({'type': 'error', 'message': '开发中'}))
         return None
 
     # 如果昵称已在线，踢掉旧连接
