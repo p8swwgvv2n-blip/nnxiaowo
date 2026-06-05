@@ -10,6 +10,7 @@ let todos = [];
 let foods = ['黄焖鸡', '麻辣烫', '牛肉面', '寿司', '炸鸡', '沙拉', '饺子', '螺蛳粉'];
 let currentChat = null;
 let todoFilter = 'all';
+let quoteMsg = null; // 引用的消息
 
 const avatarColors = ['#E89AB2','#B89AD4','#9AB8E8','#E8C49A','#9AD4C8','#E89A9A','#A8D49A','#D4D49A'];
 function getColor(name) { let h=0; for(let i=0;i<name.length;i++) h=name.charCodeAt(i)+((h<<5)-h); return avatarColors[Math.abs(h)%avatarColors.length]; }
@@ -25,6 +26,20 @@ function showStatus(msg, type) {
 
 function clearStatus() {
   document.getElementById('login-status').textContent = '';
+}
+
+// ============================================================
+// 自动更新提示
+// ============================================================
+function showUpdateBanner(currentVer, newVer, updateUrl) {
+  const banner = document.getElementById('update-banner');
+  if (!banner) return;
+  banner.innerHTML = `
+    <span>发现新版本 ${newVer}（当前 ${currentVer}）</span>
+    <button class="btn btn-primary" style="padding:4px 10px;font-size:11px;" onclick="window.open('${updateUrl}', '_blank')">更新</button>
+    <span style="cursor:pointer;opacity:0.5;" onclick="this.parentElement.style.display='none'">×</span>
+  `;
+  banner.style.display = 'flex';
 }
 
 // ============================================================
@@ -72,6 +87,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     showStatus(msg.error, 'error');
   } else if (msg.type === 'ws-disconnected') {
     showStatus('服务器连接断开', 'error');
+  } else if (msg.type === 'update-available') {
+    showUpdateBanner(msg.currentVersion, msg.newVersion, msg.updateUrl);
   }
 });
 
@@ -183,6 +200,9 @@ function enterApp() {
   document.getElementById('app-shell').classList.add('active');
   updateMemberCount();
   renderAll();
+
+  // 清除角标
+  chrome.runtime.sendMessage({ type: 'clear-badge' });
 }
 
 function updateMemberCount() {
@@ -246,17 +266,20 @@ function renderMessages() {
   const chatKey = getChatKey(myUsername, currentChat);
   const msgs = chatHistory[chatKey] || [];
 
-  container.innerHTML = msgs.map(m => {
+  container.innerHTML = msgs.map((m, idx) => {
     const isSent = m.from === myUsername;
     const readLabel = isSent ? (m.read ? '已读' : '未读') : '';
     const readClass = isSent ? (m.read ? 'read' : 'unread') : '';
+    const quoteHtml = m.quote ? `<div class="msg-quote"><span class="quote-author">${m.quote.from}:</span> ${m.quote.text}</div>` : '';
     return `
       <div class="msg-row ${isSent ? 'sent' : 'received'}">
         <div>
+          ${quoteHtml}
           <div class="msg-bubble">${m.text}</div>
           <div class="msg-time">
             ${formatTime(new Date(m.time))}
             ${isSent ? `<span class="msg-read-status ${readClass}">${readLabel}</span>` : ''}
+            <span class="msg-quote-btn" data-idx="${idx}" title="引用回复">↩</span>
           </div>
         </div>
       </div>
@@ -264,7 +287,37 @@ function renderMessages() {
   }).join('');
 
   container.scrollTop = container.scrollHeight;
+
+  // 引用按钮事件
+  container.querySelectorAll('.msg-quote-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx);
+      const msg = msgs[idx];
+      if (msg) setQuote(msg);
+    });
+  });
+
   markAsRead();
+}
+
+function setQuote(msg) {
+  quoteMsg = { from: msg.from, text: msg.text, id: msg.id };
+  const bar = document.getElementById('quote-bar');
+  bar.innerHTML = `
+    <div class="quote-bar-content">
+      <span class="quote-bar-author">${msg.from}:</span>
+      <span class="quote-bar-text">${msg.text.substring(0, 30)}${msg.text.length > 30 ? '...' : ''}</span>
+    </div>
+    <span class="quote-bar-cancel" title="取消引用">×</span>
+  `;
+  bar.style.display = 'flex';
+
+  bar.querySelector('.quote-bar-cancel').addEventListener('click', () => {
+    quoteMsg = null;
+    bar.style.display = 'none';
+  });
+
+  document.getElementById('chat-input').focus();
 }
 
 function markAsRead() {
@@ -307,21 +360,33 @@ function sendChat() {
     read: false
   };
 
+  if (quoteMsg) {
+    msg.quote = { from: quoteMsg.from, text: quoteMsg.text, id: quoteMsg.id };
+  }
+
   const chatKey = getChatKey(myUsername, currentChat);
   if (!chatHistory[chatKey]) chatHistory[chatKey] = [];
   chatHistory[chatKey].push(msg);
   renderMessages();
   renderContacts();
 
-  send({
+  const sendData = {
     type: 'chat',
     msg_id: msgId,
     text: text,
     to_user: currentChat
-  });
+  };
+  if (quoteMsg) {
+    sendData.quote = { from: quoteMsg.from, text: quoteMsg.text, id: quoteMsg.id };
+  }
+  send(sendData);
 
   input.value = '';
   input.style.height = 'auto';
+
+  // 清除引用
+  quoteMsg = null;
+  document.getElementById('quote-bar').style.display = 'none';
 }
 
 // ============================================================
