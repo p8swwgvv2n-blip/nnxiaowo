@@ -122,7 +122,7 @@ function showUpdateBanner(currentVer, newVer, updateUrl) {
   if (!banner) return;
   banner.innerHTML = `
     <span>发现新版本 ${newVer}（当前 ${currentVer}）</span>
-    <button class="btn btn-primary" style="padding:4px 10px;font-size:11px;" onclick="window.open('${updateUrl}', '_blank')">更新</button>
+    <button class="btn btn-primary" style="padding:4px 10px;font-size:11px;" onclick="window.open('${updateUrl}', '_blank')">下载更新</button>
     <span style="cursor:pointer;opacity:0.5;" onclick="this.parentElement.style.display='none'">×</span>
   `;
   banner.style.display = 'flex';
