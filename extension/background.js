@@ -1,18 +1,24 @@
 /* ============================================================
    暖暖小窝 - Background Service Worker
-   管理 WebSocket 连接
+   管理 WebSocket 连接、自动更新、角标计数
    ============================================================ */
 
 let ws = null;
 let currentUsername = '';
+let serverHttpUrl = '';
+let unreadCount = 0;
 
 // 监听来自 popup 的消息
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'connect') {
+    serverHttpUrl = msg.serverUrl.replace('ws://', 'http://').replace(/:\d+$/, ':9000');
     connectWS(msg.serverUrl, msg.username)
-      .then(() => sendResponse({ success: true }))
+      .then(() => {
+        checkForUpdate();
+        sendResponse({ success: true });
+      })
       .catch(e => sendResponse({ success: false, error: e.message }));
-    return true; // 异步响应
+    return true;
   } else if (msg.type === 'disconnect') {
     disconnectWS();
     sendResponse({ success: true });
@@ -21,18 +27,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       ws.send(JSON.stringify(msg.data));
     }
     sendResponse({ success: true });
+  } else if (msg.type === 'clear-badge') {
+    unreadCount = 0;
+    chrome.action.setBadgeText({ text: '' });
+    sendResponse({ success: true });
+  } else if (msg.type === 'get-unread') {
+    sendResponse({ count: unreadCount });
   }
 });
 
 async function connectWS(serverUrl, username) {
   return new Promise((resolve, reject) => {
-    // 关闭旧连接
     if (ws) {
       ws.close();
       ws = null;
     }
 
     currentUsername = username;
+    unreadCount = 0;
+    chrome.action.setBadgeText({ text: '' });
 
     try {
       ws = new WebSocket(serverUrl);
@@ -42,7 +55,6 @@ async function connectWS(serverUrl, username) {
     }
 
     ws.onopen = () => {
-      // 发送 join 消息
       ws.send(JSON.stringify({
         type: 'join',
         username: username
@@ -53,13 +65,18 @@ async function connectWS(serverUrl, username) {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        // 转发给 popup
+
+        // 聊天消息增加角标
+        if (data.type === 'chat' && data.message && data.message.to === currentUsername) {
+          unreadCount++;
+          chrome.action.setBadgeText({ text: String(unreadCount) });
+          chrome.action.setBadgeBackgroundColor({ color: '#E85D4A' });
+        }
+
         chrome.runtime.sendMessage({
           type: 'ws-message',
           data: data
-        }).catch(() => {
-          // popup 可能已关闭，忽略
-        });
+        }).catch(() => {});
       } catch (e) {
         console.error('消息解析错误:', e);
       }
@@ -79,7 +96,6 @@ async function connectWS(serverUrl, username) {
       }).catch(() => {});
     };
 
-    // 超时处理
     setTimeout(() => {
       if (ws && ws.readyState === WebSocket.CONNECTING) {
         ws.close();
@@ -95,4 +111,27 @@ function disconnectWS() {
     ws = null;
   }
   currentUsername = '';
+  unreadCount = 0;
+  chrome.action.setBadgeText({ text: '' });
+}
+
+async function checkForUpdate() {
+  if (!serverHttpUrl) return;
+
+  try {
+    const response = await fetch(serverHttpUrl + '/api/version');
+    const data = await response.json();
+    const currentVersion = chrome.runtime.getManifest().version;
+
+    if (data.version && data.version !== currentVersion) {
+      chrome.runtime.sendMessage({
+        type: 'update-available',
+        currentVersion: currentVersion,
+        newVersion: data.version,
+        updateUrl: serverHttpUrl + (data.update_url || '/extension/')
+      }).catch(() => {});
+    }
+  } catch (e) {
+    console.error('检查更新失败:', e);
+  }
 }
