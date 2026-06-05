@@ -254,6 +254,17 @@ body {
   color: var(--white-pure);
 }
 
+.lan-ip-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--kids-primary-wash);
+  color: var(--kids-primary);
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 4px;
+}
+
 /* Tab Bar */
 .tab-bar {
   display: flex;
