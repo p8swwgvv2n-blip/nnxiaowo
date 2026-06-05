@@ -170,11 +170,10 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
     def handle_updates_xml(self):
         # Chrome 扩展自动更新清单
         ext_id = 'hhgeodcmeagegjan'
-        server_ip = get_lan_ips()[0] if get_lan_ips() else 'localhost'
         xml = f"""<?xml version='1.0' encoding='UTF-8'?>
 <gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'>
   <app appid='{ext_id}'>
-    <updatecheck codebase='http://{server_ip}:9000/extension/extension.crx' version='{EXTENSION_VERSION}' />
+    <updatecheck codebase='https://github.com/p8swwgvv2n-blip/nnxiaowo/raw/main/extension/extension.crx' version='{EXTENSION_VERSION}' />
   </app>
 </gupdate>"""
         self.send_response(200)
