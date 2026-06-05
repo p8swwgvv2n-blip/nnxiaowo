@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "暖暖小窝",
-  "version": "1.1.0",
-  "description": "局域网好友协作工具 - 聊天、待办、午餐随机推荐",
+  "version": "1.1.1",
+  "description": "局域网好友协作工具 - 端到端加密聊天、待办、午餐随机推荐",
   "permissions": ["storage", "notifications"],
   "host_permissions": ["ws://*:*/*", "http://*:*/*"],
   "action": {
