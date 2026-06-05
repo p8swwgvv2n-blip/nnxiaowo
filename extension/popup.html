@@ -48,6 +48,9 @@
     <button class="leave-btn" id="leave-room-btn">退出</button>
   </div>
 
+  <!-- 更新提示 -->
+  <div class="update-banner" id="update-banner" style="display:none;"></div>
+
   <div class="tab-bar">
     <button class="tab-btn active" data-page="page-chat">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -80,6 +83,7 @@
             <span id="chat-header-name"></span>
           </div>
           <div class="chat-messages" id="chat-messages"></div>
+          <div class="quote-bar" id="quote-bar" style="display:none;"></div>
           <div class="chat-input-area">
             <textarea class="input chat-input" id="chat-input" placeholder="输入消息..." rows="1"></textarea>
             <button class="btn btn-primary send-btn" id="send-btn">发送</button>
