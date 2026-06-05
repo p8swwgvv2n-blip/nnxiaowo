@@ -77,6 +77,10 @@ function disconnect() {
   chatHistory = {};
   todos = [];
   currentChat = null;
+  document.getElementById('lan-ip-display').style.display = 'none';
+  document.getElementById('lan-ip-display').textContent = '';
+  document.getElementById('quote-bar').style.display = 'none';
+  quoteMsg = null;
 }
 
 // 监听来自 background 的消息
@@ -107,6 +111,9 @@ function handleMessage(data) {
         chatHistory = data.state.chat_history || {};
         todos = data.state.todos || [];
         foods = data.state.foods || foods;
+      }
+      if (data.lan_ips) {
+        showLanIps(data.lan_ips);
       }
       enterApp();
       break;
@@ -203,6 +210,17 @@ function enterApp() {
 
   // 清除角标
   chrome.runtime.sendMessage({ type: 'clear-badge' });
+}
+
+function showLanIps(ips) {
+  const ipDisplay = document.getElementById('lan-ip-display');
+  if (ipDisplay && ips && ips.length > 0) {
+    const filteredIps = ips.filter(ip => !ip.startsWith('127.'));
+    if (filteredIps.length > 0) {
+      ipDisplay.textContent = filteredIps.join(' / ');
+      ipDisplay.style.display = 'inline';
+    }
+  }
 }
 
 function updateMemberCount() {
@@ -536,6 +554,31 @@ function playNotificationSound() {
 // 初始化
 // ============================================================
 (function() {
+  // 检查是否有保存的会话，自动恢复
+  chrome.runtime.sendMessage({ type: 'get-session' }, (session) => {
+    if (session && session.isConnected && session.username) {
+      // 已连接，直接进入应用
+      myUsername = session.username;
+      members = session.members || [];
+      if (session.lanIps && session.lanIps.length > 0) {
+        showLanIps(session.lanIps);
+      }
+      enterApp();
+    } else if (session && session.serverUrl && !session.isConnected) {
+      // 有会话但断开了，尝试重连
+      showStatus('正在恢复连接...', '');
+      chrome.runtime.sendMessage({ type: 'reconnect' }, (response) => {
+        if (response && response.success) {
+          // 重连成功，等待 room-joined
+        } else {
+          // 重连失败，显示登录页
+          clearStatus();
+        }
+      });
+    }
+    // 否则显示登录页
+  });
+
   // 从存储恢复服务器地址
   chrome.storage.local.get(['serverUrl'], (result) => {
     if (result.serverUrl) {
