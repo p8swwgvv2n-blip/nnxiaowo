@@ -683,11 +683,6 @@ main {
       <input class="input" type="text" id="username-input" placeholder="输入你的昵称..." maxlength="12" autocomplete="off" />
     </div>
 
-    <div class="login-field">
-      <label for="code-input">校验码</label>
-      <input class="input" type="password" id="code-input" placeholder="输入校验码..." maxlength="10" autocomplete="off" />
-    </div>
-
     <div class="login-actions">
       <button class="btn btn-primary" id="enter-btn">进入</button>
     </div>
@@ -700,7 +695,7 @@ main {
     <div class="login-status" id="login-status"></div>
 
     <div class="login-footer">
-      <div class="version">v3.3.0 · 2026.06.05</div>
+      <div class="version">v3.4.0 · 2026.06.05</div>
       <div class="developer">开发人：小石头</div>
       <div class="copyright">本产品受知识产权保护</div>
     </div>
@@ -1031,13 +1026,11 @@ function getChatKey(a, b) {
    ============================================================ */
 function joinRoom() {
   myUsername = document.getElementById('username-input').value.trim();
-  const code = document.getElementById('code-input').value.trim();
 
   if (!myUsername) { showStatus('请先输入昵称', 'error'); return; }
-  if (!code) { showStatus('请输入校验码', 'error'); return; }
   if (!ws || ws.readyState !== WebSocket.OPEN) { showStatus('正在连接服务器，请稍后再试', 'error'); return; }
 
-  send({ type: 'join', username: myUsername, code: code });
+  send({ type: 'join', username: myUsername });
 }
 
 function leaveRoom() {
@@ -1046,7 +1039,6 @@ function leaveRoom() {
   document.getElementById('app-shell').classList.remove('active');
   document.getElementById('login-page').style.display = 'flex';
   document.getElementById('username-input').value = '';
-  document.getElementById('code-input').value = '';
   clearStatus();
   roomId = '';
   members = [];
@@ -1365,7 +1357,6 @@ function renderAll() {
   // 进入按钮
   document.getElementById('enter-btn').addEventListener('click', joinRoom);
   document.getElementById('username-input').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoom(); });
-  document.getElementById('code-input').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoom(); });
 
   // 离开房间
   document.getElementById('leave-room-btn').addEventListener('click', leaveRoom);
