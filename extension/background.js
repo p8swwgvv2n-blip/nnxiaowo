@@ -166,6 +166,20 @@ function disconnectWS() {
   chrome.action.setBadgeText({ text: '' });
 }
 
+// 语义化版本比较：返回 -1 (v1<v2), 0 (相等), 1 (v1>v2)
+function compareVersion(v1, v2) {
+  const parts1 = v1.split('.').map(Number);
+  const parts2 = v2.split('.').map(Number);
+  const len = Math.max(parts1.length, parts2.length);
+  for (let i = 0; i < len; i++) {
+    const p1 = parts1[i] || 0;
+    const p2 = parts2[i] || 0;
+    if (p1 < p2) return -1;
+    if (p1 > p2) return 1;
+  }
+  return 0;
+}
+
 async function checkForUpdate() {
   if (!serverHttpUrl) return;
 
@@ -174,7 +188,8 @@ async function checkForUpdate() {
     const data = await response.json();
     const currentVersion = chrome.runtime.getManifest().version;
 
-    if (data.version && data.version !== currentVersion) {
+    // 只在服务器版本 > 本地版本时提示更新
+    if (data.version && compareVersion(currentVersion, data.version) < 0) {
       chrome.runtime.sendMessage({
         type: 'update-available',
         currentVersion: currentVersion,
