@@ -39,7 +39,8 @@ HTTP_PORT = 9000
 WS_PORT = 9001
 HOST = '0.0.0.0'
 FIXED_ROOM_ID = '暖暖小窝'
-VERIFY_CODE = '043513'
+VERIFY_CODE = '小白猪'
+ALLOWED_NAMES = ['大灰狼', '懒洋洋']
 HISTORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'chat_history.json')
 
 # ============================================================
@@ -211,6 +212,11 @@ async def handle_join(websocket, data):
     # 校验码验证
     if code != VERIFY_CODE:
         await websocket.send(json.dumps({'type': 'error', 'message': '校验码错误'}))
+        return None
+
+    # 昵称限制
+    if username not in ALLOWED_NAMES:
+        await websocket.send(json.dumps({'type': 'error', 'message': '该昵称暂未开放，请使用「大灰狼」或「懒洋洋」'}))
         return None
 
     # 如果昵称已在线，踢掉旧连接
