@@ -5,6 +5,7 @@
   "description": "局域网好友协作工具 - 端到端加密聊天、待办、午餐随机推荐",
   "permissions": ["storage", "notifications", "alarms"],
   "host_permissions": ["ws://*:*/*", "http://*:*/*"],
+  "update_url": "http://30.165.103.140:9000/extension/updates.xml",
   "action": {
     "default_popup": "popup.html",
     "default_title": "暖暖小窝",
