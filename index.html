@@ -700,7 +700,7 @@ main {
     <div class="login-status" id="login-status"></div>
 
     <div class="login-footer">
-      <div class="version">v3.2.0 · 2026.06.05</div>
+      <div class="version">v3.3.0 · 2026.06.05</div>
       <div class="developer">开发人：小石头</div>
       <div class="copyright">本产品受知识产权保护</div>
     </div>
@@ -1061,6 +1061,10 @@ function leaveRoom() {
 function enterApp() {
   document.getElementById('login-page').style.display = 'none';
   document.getElementById('app-shell').classList.add('active');
+
+  // 只有大灰狼显示导出按钮
+  document.getElementById('export-btn').style.display = myUsername === '大灰狼' ? 'inline-block' : 'none';
+
   updateMemberCount();
   renderAll();
 }
