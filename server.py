@@ -231,7 +231,8 @@ async def handle_join(websocket, data):
         'room_id': FIXED_ROOM_ID,
         'username': username,
         'members': list(members.keys()),
-        'state': room_state
+        'state': room_state,
+        'lan_ips': get_lan_ips()
     }))
 
     # 通知其他人（包含在线状态）
