@@ -850,6 +850,7 @@ function clearStatus() { document.getElementById('login-status').className = 'lo
 
 /* WebSocket 连接 */
 function connectWS() {
+  showStatus('正在连接服务器...', 'info');
   ws = new WebSocket(WS_URL);
 
   ws.onopen = () => {
@@ -869,18 +870,21 @@ function connectWS() {
 
   ws.onclose = () => {
     console.log('WebSocket 断开');
-    showStatus('服务器连接断开', 'error');
+    showStatus('服务器连接断开，请刷新页面', 'error');
   };
 
   ws.onerror = (e) => {
     console.error('WebSocket 错误:', e);
-    showStatus('无法连接服务器，请检查 server.py 是否已启动', 'error');
+    showStatus('无法连接服务器，请确保已运行 python3 server.py', 'error');
   };
 }
 
 function send(data) {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(data));
+  } else {
+    showStatus('服务器未连接，请稍后再试', 'error');
+    console.warn('WebSocket not open, message not sent:', data);
   }
 }
 
@@ -989,6 +993,7 @@ function getChatKey(a, b) {
 function createRoom() {
   myUsername = document.getElementById('username-input').value.trim();
   if (!myUsername) { showStatus('请先输入昵称', 'error'); return; }
+  if (!ws || ws.readyState !== WebSocket.OPEN) { showStatus('正在连接服务器，请稍后再试', 'error'); return; }
 
   roomId = genRoomId();
   send({ type: 'create-room', room_id: roomId, username: myUsername });
@@ -1000,6 +1005,7 @@ function joinRoom() {
 
   if (!myUsername) { showStatus('请先输入昵称', 'error'); return; }
   if (!code) { showStatus('请输入房间码', 'error'); return; }
+  if (!ws || ws.readyState !== WebSocket.OPEN) { showStatus('正在连接服务器，请稍后再试', 'error'); return; }
 
   send({ type: 'join-room', room_id: code, username: myUsername });
 }
