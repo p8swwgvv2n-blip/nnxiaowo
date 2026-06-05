@@ -27,6 +27,7 @@ except ImportError:
 HTTP_PORT = 9000
 WS_PORT = 9001
 HOST = '0.0.0.0'
+FIXED_ROOM_ID = '暖暖小窝'
 
 # ============================================================
 # HTTP 静态文件服务器
@@ -41,15 +42,21 @@ def run_http():
     server.serve_forever()
 
 # ============================================================
-# WebSocket 房间管理服务器
+# WebSocket 房间管理
 # ============================================================
-rooms = {}      # room_id -> { "host": username, "members": {username: ws}, "state": {...} }
-clients = {}    # ws -> { "room_id": str, "username": str }
+# 固定房间状态
+room_state = {
+    'chat_history': {},
+    'todos': [],
+    'foods': ['黄焖鸡', '麻辣烫', '牛肉面', '寿司', '炸鸡', '沙拉', '饺子', '螺蛳粉']
+}
+members = {}    # username -> websocket
+clients = {}    # websocket -> username
 
 
 async def handle_client(websocket):
     """处理 WebSocket 客户端连接"""
-    client_info = None
+    username = None
 
     try:
         async for message in websocket:
@@ -57,16 +64,10 @@ async def handle_client(websocket):
                 data = json.loads(message)
                 msg_type = data.get('type')
 
-                if msg_type == 'create-room':
-                    client_info = await handle_create_room(websocket, data)
-                elif msg_type == 'join-room':
-                    client_info = await handle_join_room(websocket, data)
-                elif msg_type == 'leave':
-                    await handle_leave(websocket, client_info)
-                    client_info = None
-                elif client_info:
-                    # 已加入房间的客户端，转发消息
-                    await handle_room_message(websocket, client_info, data)
+                if msg_type == 'join':
+                    username = await handle_join(websocket, data)
+                elif username:
+                    await handle_message(websocket, username, data)
 
             except json.JSONDecodeError:
                 pass
@@ -76,111 +77,64 @@ async def handle_client(websocket):
     except websockets.exceptions.ConnectionClosed:
         pass
     finally:
-        if client_info:
-            await handle_leave(websocket, client_info)
+        if username:
+            await handle_leave(websocket, username)
 
 
-async def handle_create_room(websocket, data):
-    """创建房间"""
-    room_id = data.get('room_id', '').strip()
+async def handle_join(websocket, data):
+    """加入固定房间"""
     username = data.get('username', '').strip()
 
-    if not room_id or not username:
-        await websocket.send(json.dumps({'type': 'error', 'message': '参数不完整'}))
+    if not username:
+        await websocket.send(json.dumps({'type': 'error', 'message': '请输入昵称'}))
         return None
 
-    if room_id in rooms:
-        await websocket.send(json.dumps({'type': 'error', 'message': '房间已存在'}))
-        return None
+    # 如果昵称已在线，踢掉旧连接
+    if username in members:
+        old_ws = members[username]
+        try:
+            await old_ws.send(json.dumps({'type': 'kicked', 'message': '相同昵称从其他设备登录'}))
+            await old_ws.close()
+        except:
+            pass
+        if old_ws in clients:
+            del clients[old_ws]
 
-    rooms[room_id] = {
-        'host': username,
-        'members': {username: websocket},
-        'state': {
-            'chat_history': {},
-            'todos': [],
-            'foods': ['黄焖鸡', '麻辣烫', '牛肉面', '寿司', '炸鸡', '沙拉', '饺子', '螺蛳粉']
-        }
-    }
+    members[username] = websocket
+    clients[websocket] = username
 
-    info = {'room_id': room_id, 'username': username}
-    clients[websocket] = info
-
-    await websocket.send(json.dumps({
-        'type': 'room-created',
-        'room_id': room_id,
-        'username': username
-    }))
-
-    print(f'[房间创建] {room_id} by {username}')
-    return info
-
-
-async def handle_join_room(websocket, data):
-    """加入房间"""
-    room_id = data.get('room_id', '').strip()
-    username = data.get('username', '').strip()
-
-    if not room_id or not username:
-        await websocket.send(json.dumps({'type': 'error', 'message': '参数不完整'}))
-        return None
-
-    if room_id not in rooms:
-        await websocket.send(json.dumps({'type': 'error', 'message': '房间不存在'}))
-        return None
-
-    room = rooms[room_id]
-
-    if username in room['members']:
-        await websocket.send(json.dumps({'type': 'error', 'message': '昵称已被使用'}))
-        return None
-
-    room['members'][username] = websocket
-    info = {'room_id': room_id, 'username': username}
-    clients[websocket] = info
-
-    # 发送完整状态给加入者
+    # 发送房间状态给新加入者
     await websocket.send(json.dumps({
         'type': 'room-joined',
-        'room_id': room_id,
+        'room_id': FIXED_ROOM_ID,
         'username': username,
-        'members': list(room['members'].keys()),
-        'state': room['state']
+        'members': list(members.keys()),
+        'state': room_state
     }))
 
-    # 通知房间内其他人
-    await broadcast(room_id, {
+    # 通知其他人
+    await broadcast({
         'type': 'member-joined',
         'username': username,
-        'members': list(room['members'].keys())
+        'members': list(members.keys())
     }, exclude=websocket)
 
-    print(f'[房间加入] {room_id}: {username}')
-    return info
+    print(f'[加入] {username} (共 {len(members)} 人在线)')
+    return username
 
 
-async def handle_room_message(websocket, client_info, data):
-    """处理房间内消息"""
-    room_id = client_info['room_id']
-    username = client_info['username']
-
-    if room_id not in rooms:
-        return
-
-    room = rooms[room_id]
+async def handle_message(websocket, username, data):
+    """处理消息"""
     msg_type = data.get('type')
 
-    # 根据消息类型处理
     if msg_type == 'chat':
-        # 聊天消息 - 存储并转发
         msg_id = data.get('msg_id', f"msg-{datetime.now().timestamp()}")
         text = data.get('text', '')
         to_user = data.get('to_user')
 
-        # 存储到房间状态
         chat_key = get_chat_key(username, to_user) if to_user else f"{username}->all"
-        if chat_key not in room['state']['chat_history']:
-            room['state']['chat_history'][chat_key] = []
+        if chat_key not in room_state['chat_history']:
+            room_state['chat_history'][chat_key] = []
 
         msg = {
             'id': msg_id,
@@ -189,109 +143,88 @@ async def handle_room_message(websocket, client_info, data):
             'to': to_user,
             'time': datetime.now().isoformat()
         }
-        room['state']['chat_history'][chat_key].append(msg)
+        room_state['chat_history'][chat_key].append(msg)
 
-        # 转发
         if to_user:
-            target_ws = room['members'].get(to_user)
+            target_ws = members.get(to_user)
             if target_ws:
                 await target_ws.send(json.dumps({'type': 'chat', 'message': msg}))
         else:
-            await broadcast(room_id, {'type': 'chat', 'message': msg}, exclude=websocket)
+            await broadcast({'type': 'chat', 'message': msg}, exclude=websocket)
 
-        # 回执
         await websocket.send(json.dumps({'type': 'chat-receipt', 'msg_id': msg_id}))
 
     elif msg_type == 'todo-add':
         todo = data.get('todo', {})
         todo['created_by'] = username
-        room['state']['todos'].append(todo)
-        await broadcast(room_id, {'type': 'todo-added', 'todo': todo}, exclude=websocket)
+        room_state['todos'].append(todo)
+        await broadcast({'type': 'todo-added', 'todo': todo}, exclude=websocket)
 
     elif msg_type == 'todo-toggle':
         todo_id = data.get('id')
-        for t in room['state']['todos']:
+        for t in room_state['todos']:
             if t['id'] == todo_id:
                 t['done'] = not t.get('done', False)
                 break
-        await broadcast(room_id, {'type': 'todo-toggled', 'id': todo_id}, exclude=websocket)
+        await broadcast({'type': 'todo-toggled', 'id': todo_id}, exclude=websocket)
 
     elif msg_type == 'todo-delete':
         todo_id = data.get('id')
-        room['state']['todos'] = [t for t in room['state']['todos'] if t['id'] != todo_id]
-        await broadcast(room_id, {'type': 'todo-deleted', 'id': todo_id}, exclude=websocket)
+        room_state['todos'] = [t for t in room_state['todos'] if t['id'] != todo_id]
+        await broadcast({'type': 'todo-deleted', 'id': todo_id}, exclude=websocket)
 
     elif msg_type == 'food-add':
         food = data.get('food', '')
-        if food and food not in room['state']['foods']:
-            room['state']['foods'].append(food)
-        await broadcast(room_id, {'type': 'food-added', 'food': food}, exclude=websocket)
+        if food and food not in room_state['foods']:
+            room_state['foods'].append(food)
+        await broadcast({'type': 'food-added', 'food': food}, exclude=websocket)
 
     elif msg_type == 'food-remove':
         food = data.get('food', '')
-        if food in room['state']['foods']:
-            room['state']['foods'].remove(food)
-        await broadcast(room_id, {'type': 'food-removed', 'food': food}, exclude=websocket)
+        if food in room_state['foods']:
+            room_state['foods'].remove(food)
+        await broadcast({'type': 'food-removed', 'food': food}, exclude=websocket)
 
     elif msg_type == 'sync-request':
         await websocket.send(json.dumps({
             'type': 'sync',
-            'state': room['state'],
-            'members': list(room['members'].keys())
+            'state': room_state,
+            'members': list(members.keys())
         }))
 
     else:
-        # 未知类型，直接广播
-        await broadcast(room_id, data, exclude=websocket)
+        await broadcast(data, exclude=websocket)
 
 
-async def handle_leave(websocket, client_info):
-    """处理离开房间"""
-    if not client_info:
-        return
-
-    room_id = client_info['room_id']
-    username = client_info['username']
-
-    if room_id in rooms:
-        room = rooms[room_id]
-        if username in room['members']:
-            del room['members'][username]
-
-        await broadcast(room_id, {
-            'type': 'member-left',
-            'username': username,
-            'members': list(room['members'].keys())
-        })
-
-        if not room['members']:
-            del rooms[room_id]
-            print(f'[房间删除] {room_id} (空)')
+async def handle_leave(websocket, username):
+    """处理离开"""
+    if username in members:
+        del members[username]
 
     if websocket in clients:
         del clients[websocket]
 
-    print(f'[离开] {username} from {room_id}')
+    await broadcast({
+        'type': 'member-left',
+        'username': username,
+        'members': list(members.keys())
+    })
+
+    print(f'[离开] {username} (共 {len(members)} 人在线)')
 
 
-async def broadcast(room_id, data, exclude=None):
-    """广播消息给房间所有人"""
-    if room_id not in rooms:
-        return
-
-    room = rooms[room_id]
+async def broadcast(data, exclude=None):
+    """广播消息给所有人"""
     message = json.dumps(data)
-
-    for member_ws in room['members'].values():
-        if member_ws != exclude:
+    for ws in list(members.values()):
+        if ws != exclude:
             try:
-                await member_ws.send(message)
+                await ws.send(message)
             except:
                 pass
 
 
 def get_chat_key(a, b):
-    """生成聊天键（确保双方唯一）"""
     return '<->'.join(sorted([a, b]))
 
 
@@ -330,17 +263,16 @@ async def ws_main():
             print('')
         print(f'  🔌 WebSocket: ws://localhost:{WS_PORT}')
         print('')
+        print('  输入昵称即可进入，所有人共享同一个房间')
         print('  按 Ctrl+C 停止服务器')
         print('')
         await asyncio.Future()
 
 
 def main():
-    # 后台启动 HTTP 服务器
     t = threading.Thread(target=run_http, daemon=True)
     t.start()
 
-    # 启动 WebSocket 服务器
     try:
         asyncio.run(ws_main())
     except KeyboardInterrupt:
