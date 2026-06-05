@@ -63,6 +63,10 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_extension_page()
         elif parsed.path == '/extension/extension.zip':
             self.handle_extension_download()
+        elif parsed.path == '/extension/extension.crx':
+            self.handle_extension_crx()
+        elif parsed.path == '/extension/updates.xml':
+            self.handle_updates_xml()
         else:
             super().do_GET()
 
@@ -144,6 +148,40 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header('Content-Type', 'text/plain')
             self.end_headers()
             self.wfile.write(b'extension.zip not found')
+
+    def handle_extension_crx(self):
+        # 提供 CRX3 文件用于自动更新
+        crx_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'extension.crx')
+        if os.path.exists(crx_path):
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/x-chrome-extension')
+            self.send_header('Content-Disposition', 'attachment; filename="extension.crx"')
+            self.send_header('Content-Length', str(os.path.getsize(crx_path)))
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            with open(crx_path, 'rb') as f:
+                self.wfile.write(f.read())
+        else:
+            self.send_response(404)
+            self.send_header('Content-Type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(b'extension.crx not found')
+
+    def handle_updates_xml(self):
+        # Chrome 扩展自动更新清单
+        ext_id = 'hhgeodcmeagegjan'
+        server_ip = get_lan_ips()[0] if get_lan_ips() else 'localhost'
+        xml = f"""<?xml version='1.0' encoding='UTF-8'?>
+<gupdate xmlns='http://www.google.com/update2/response' protocol='2.0'>
+  <app appid='{ext_id}'>
+    <updatecheck codebase='http://{server_ip}:9000/extension/extension.crx' version='{EXTENSION_VERSION}' />
+  </app>
+</gupdate>"""
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/xml; charset=utf-8')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(xml.encode('utf-8'))
 
     def handle_history_json(self):
         self.send_response(200)
