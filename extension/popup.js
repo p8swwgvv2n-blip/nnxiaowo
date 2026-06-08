@@ -746,6 +746,13 @@ function playNotificationSound() {
 // 初始化
 // ============================================================
 (function() {
+  // 显示版本号
+  const version = chrome.runtime.getManifest().version;
+  const loginVersion = document.getElementById('login-version');
+  if (loginVersion) loginVersion.textContent = `v${version} · 浏览器插件版`;
+  const versionBadge = document.getElementById('version-badge');
+  if (versionBadge) versionBadge.textContent = `v${version}`;
+
   // 打开插件时清除角标
   chrome.runtime.sendMessage({ type: 'clear-badge' });
 
