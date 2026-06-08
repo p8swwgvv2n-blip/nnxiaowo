@@ -14,17 +14,44 @@ let isReconnecting = false;
 
 // ============================================================
 // 保持 Service Worker 存活 (Manifest V3 会杀死空闲的 SW)
+// 使用自连接 port + alarms 双重保活
 // ============================================================
-chrome.alarms.create('keepalive', { periodInMinutes: 0.5 }); // 每30秒
+let keepAlivePort = null;
+
+function startKeepAlive() {
+  if (keepAlivePort) return;
+  try {
+    keepAlivePort = chrome.runtime.connect({ name: 'keepalive' });
+    keepAlivePort.onDisconnect.addListener(() => {
+      keepAlivePort = null;
+      // 如果还有用户名，说明应该保持连接，重新建立 port
+      if (currentUsername) {
+        setTimeout(startKeepAlive, 1000);
+      }
+    });
+  } catch(e) {}
+}
+
+function stopKeepAlive() {
+  if (keepAlivePort) {
+    try { keepAlivePort.disconnect(); } catch(e) {}
+    keepAlivePort = null;
+  }
+}
+
+// alarms 作为备用保活机制
+chrome.alarms.create('keepalive', { periodInMinutes: 0.4 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'keepalive') {
-    // 发送 WebSocket ping 保持连接
     if (ws && ws.readyState === WebSocket.OPEN) {
       try { ws.send('ping'); } catch(e) {}
     } else if (!isReconnecting && currentUsername && serverWsUrl) {
-      // WebSocket 已断开，尝试自动重连
       autoReconnect();
+    }
+    // 确保 keepalive port 存在
+    if (currentUsername && !keepAlivePort) {
+      startKeepAlive();
     }
   }
 });
@@ -145,6 +172,8 @@ async function connectWS(serverUrl, username) {
         type: 'join',
         username: username
       }));
+      // 连接成功后启动 keepalive
+      startKeepAlive();
       resolve();
     };
 
@@ -217,6 +246,7 @@ async function connectWS(serverUrl, username) {
 }
 
 function disconnectWS() {
+  stopKeepAlive();
   if (ws) {
     ws.close();
     ws = null;
