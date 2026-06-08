@@ -228,6 +228,14 @@ input, select, textarea { font-family: inherit; border: none; outline: none; }
   flex-shrink: 0;
 }
 .room-info-bar svg { color: var(--kids-success); flex-shrink: 0; }
+.version-badge {
+  font-size: 10px;
+  color: var(--kids-primary);
+  font-weight: 700;
+  padding: 2px 8px;
+  background: rgba(25, 200, 185, 0.15);
+  border-radius: 8px;
+}
 .room-id { font-weight: 700; color: var(--kids-title); letter-spacing: 0.04em; }
 .member-count { margin-left: auto; font-weight: 600; }
 .leave-btn {
@@ -695,7 +703,7 @@ main {
     <div class="login-status" id="login-status"></div>
 
     <div class="login-footer">
-      <div class="version">v3.4.0 · 2026.06.05</div>
+      <div class="version" id="login-version">v3.4.0 · 2026.06.05</div>
       <div class="developer">开发人：小石头</div>
       <div class="copyright">本产品受知识产权保护</div>
     </div>
@@ -707,6 +715,7 @@ main {
   <div class="room-info-bar">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
     暖暖小窝
+    <span class="version-badge" id="version-badge"></span>
     <span class="member-count" id="member-count">1 人在线</span>
     <button class="btn btn-secondary" id="export-btn" style="padding:4px 12px;font-size:12px;margin-right:8px;">导出聊天</button>
     <span id="lan-ip-display" style="display:none;font-size:12px;color:var(--kids-muted);margin-right:8px;"></span>
@@ -829,6 +838,7 @@ main {
 /* ============================================================
    WebSocket 连接层
    ============================================================ */
+const WEB_VERSION = '3.4.0';
 const WS_URL = `ws://${window.location.hostname}:9001`;
 let ws = null;
 let myUsername = '';
@@ -840,6 +850,14 @@ let foods = ['黄焖鸡', '麻辣烫', '牛肉面', '寿司', '炸鸡', '沙拉'
 let currentChat = null;
 let todoFilter = 'all';
 let quoteMsg = null;
+
+// 设置版本号显示
+document.addEventListener('DOMContentLoaded', () => {
+  const loginVersion = document.getElementById('login-version');
+  if (loginVersion) loginVersion.textContent = `v${WEB_VERSION} · 2026.06.05`;
+  const versionBadge = document.getElementById('version-badge');
+  if (versionBadge) versionBadge.textContent = `v${WEB_VERSION}`;
+});
 
 // ============================================================
 // 端到端加密 (E2EE) 模块
