@@ -437,6 +437,13 @@ function renderContacts() {
       document.getElementById('chat-header-name').textContent = currentChat;
       renderMessages();
       renderContacts();
+
+      // 绑定滚动事件
+      const container = document.getElementById('chat-messages');
+      if (!container.dataset.scrollBound) {
+        container.addEventListener('scroll', onChatScroll);
+        container.dataset.scrollBound = 'true';
+      }
     });
   });
 }
@@ -456,7 +463,7 @@ function renderMessages() {
     const readClass = isSent ? (m.read ? 'read' : 'unread') : '';
     const quoteHtml = m.quote ? `<div class="msg-quote"><span class="quote-author">${m.quote.from}:</span> ${m.quote.text}</div>` : '';
     return `
-      <div class="msg-row ${isSent ? 'sent' : 'received'}">
+      <div class="msg-row ${isSent ? 'sent' : 'received'}" data-msg-id="${m.id}" data-idx="${idx}">
         <div>
           ${quoteHtml}
           <div class="msg-bubble">${m.text}</div>
@@ -481,7 +488,54 @@ function renderMessages() {
     });
   });
 
-  markAsRead();
+  markVisibleAsRead();
+}
+
+// 只标记实际可见的消息为已读
+function markVisibleAsRead() {
+  if (!currentChat) return;
+  const container = document.getElementById('chat-messages');
+  const chatKey = getChatKey(myUsername, currentChat);
+  const msgs = chatHistory[chatKey] || [];
+
+  const containerRect = container.getBoundingClientRect();
+  const msgElements = container.querySelectorAll('.msg-row.received');
+  const visibleIds = [];
+
+  msgElements.forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.top < containerRect.bottom && rect.bottom > containerRect.top) {
+      const msgId = el.dataset.msgId;
+      if (msgId) visibleIds.push(msgId);
+    }
+  });
+
+  if (visibleIds.length === 0) return;
+
+  const unreadIds = [];
+  msgs.forEach(m => {
+    if (m.to === myUsername && !m.read && visibleIds.includes(m.id)) {
+      unreadIds.push(m.id);
+      m.read = true;
+    }
+  });
+
+  if (unreadIds.length === 0) return;
+
+  send({
+    type: 'chat-read',
+    chat_key: chatKey,
+    msg_ids: unreadIds,
+    to_user: currentChat
+  });
+
+  renderContacts();
+}
+
+let scrollTimeout = null;
+function onChatScroll() {
+  clearTimeout(scrollTimeout);
+  scrollTimeout = setTimeout(markVisibleAsRead, 200);
 }
 
 function setQuote(msg) {
@@ -504,27 +558,6 @@ function setQuote(msg) {
   document.getElementById('chat-input').focus();
 }
 
-function markAsRead() {
-  if (!currentChat) return;
-  const chatKey = getChatKey(myUsername, currentChat);
-  const msgs = chatHistory[chatKey] || [];
-  const unreadIds = msgs.filter(m => m.to === myUsername && !m.read).map(m => m.id);
-
-  if (unreadIds.length === 0) return;
-
-  msgs.forEach(m => {
-    if (m.to === myUsername && !m.read) m.read = true;
-  });
-
-  send({
-    type: 'chat-read',
-    chat_key: chatKey,
-    msg_ids: unreadIds,
-    to_user: currentChat
-  });
-
-  renderContacts();
-}
 
 // ============================================================
 // 发送消息
