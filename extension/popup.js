@@ -799,12 +799,14 @@ function playNotificationSound() {
         showLanIps(session.lanIps);
       }
       enterApp();
+      // 请求完整状态同步（恢复聊天记录）
+      send({ type: 'sync-request' });
     } else if (session && session.serverUrl && !session.isConnected) {
       // 有会话但断开了，尝试重连
       showStatus('正在恢复连接...', '');
       chrome.runtime.sendMessage({ type: 'reconnect' }, (response) => {
         if (response && response.success) {
-          // 重连成功，等待 room-joined
+          // 重连成功，等待 room-joined 或 sync
         } else {
           // 重连失败，显示登录页
           clearStatus();
