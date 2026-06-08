@@ -1238,6 +1238,13 @@ function renderContacts() {
       document.getElementById('chat-header-name').textContent = currentChat;
       renderMessages();
       renderContacts();
+
+      // 绑定滚动事件（只绑定一次）
+      const container = document.getElementById('chat-messages');
+      if (!container.dataset.scrollBound) {
+        container.addEventListener('scroll', onChatScroll);
+        container.dataset.scrollBound = 'true';
+      }
     });
   });
 }
@@ -1251,12 +1258,12 @@ function renderMessages() {
   const chatKey = getChatKey(myUsername, currentChat);
   const msgs = chatHistory[chatKey] || [];
 
-  container.innerHTML = msgs.map(m => {
+  container.innerHTML = msgs.map((m, idx) => {
     const isSent = m.from === myUsername;
     const readLabel = isSent ? (m.read ? '已读' : '未读') : '';
     const readClass = isSent ? (m.read ? 'read' : 'unread') : '';
     return `
-      <div class="msg-row ${isSent ? 'sent' : 'received'}">
+      <div class="msg-row ${isSent ? 'sent' : 'received'}" data-msg-id="${m.id}" data-idx="${idx}">
         <div>
           <div class="msg-bubble">${m.text}</div>
           <div class="msg-time">
@@ -1270,22 +1277,42 @@ function renderMessages() {
 
   container.scrollTop = container.scrollHeight;
 
-  // 标记当前对话的消息为已读
-  markAsRead();
+  // 标记当前可见的消息为已读
+  markVisibleAsRead();
 }
 
-function markAsRead() {
+// 只标记实际可见的消息为已读
+function markVisibleAsRead() {
   if (!currentChat) return;
+  const container = document.getElementById('chat-messages');
   const chatKey = getChatKey(myUsername, currentChat);
   const msgs = chatHistory[chatKey] || [];
-  const unreadIds = msgs.filter(m => m.to === myUsername && !m.read).map(m => m.id);
+
+  const containerRect = container.getBoundingClientRect();
+  const msgElements = container.querySelectorAll('.msg-row.received');
+  const visibleIds = [];
+
+  msgElements.forEach(el => {
+    const rect = el.getBoundingClientRect();
+    // 消息在容器可视区域内
+    if (rect.top < containerRect.bottom && rect.bottom > containerRect.top) {
+      const msgId = el.dataset.msgId;
+      if (msgId) visibleIds.push(msgId);
+    }
+  });
+
+  if (visibleIds.length === 0) return;
+
+  // 找出未读的可见消息
+  const unreadIds = [];
+  msgs.forEach(m => {
+    if (m.to === myUsername && !m.read && visibleIds.includes(m.id)) {
+      unreadIds.push(m.id);
+      m.read = true;
+    }
+  });
 
   if (unreadIds.length === 0) return;
-
-  // 本地标记为已读
-  msgs.forEach(m => {
-    if (m.to === myUsername && !m.read) m.read = true;
-  });
 
   // 通知服务器
   send({
@@ -1295,8 +1322,15 @@ function markAsRead() {
     to_user: currentChat
   });
 
-  // 更新未读计数
-  renderContacts();
+  // 更新界面
+  renderMessages();
+}
+
+// 滚动时检查新可见的消息
+let scrollTimeout = null;
+function onChatScroll() {
+  clearTimeout(scrollTimeout);
+  scrollTimeout = setTimeout(markVisibleAsRead, 200);
 }
 
 /* ============================================================
