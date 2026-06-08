@@ -46,11 +46,14 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'keepalive') {
     if (ws && ws.readyState === WebSocket.OPEN) {
       try { ws.send('ping'); } catch(e) {}
+      console.log('[keepalive] ping sent, ws still alive');
     } else if (!isReconnecting && currentUsername && serverWsUrl) {
+      console.log('[keepalive] ws disconnected, attempting reconnect...');
       autoReconnect();
     }
     // 确保 keepalive port 存在
     if (currentUsername && !keepAlivePort) {
+      console.log('[keepalive] port lost, restarting keepalive');
       startKeepAlive();
     }
   }
