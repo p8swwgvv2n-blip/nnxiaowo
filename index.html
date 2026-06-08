@@ -1031,44 +1031,57 @@ function handleMessage(data) {
 
     case 'e2ee-key-offer':
       (async () => {
-        const peerName = data.from;
-        const chatKey = getChatKey(myUsername, peerName);
-        await e2ee.deriveSharedKey(data.public_key, chatKey);
-        const myPub = await e2ee.exportPublicKey();
-        ws.send(JSON.stringify({ type: 'e2ee-key-answer', public_key: myPub, to_user: peerName }));
+        try {
+          const peerName = data.from;
+          const chatKey = getChatKey(myUsername, peerName);
+          await e2ee.deriveSharedKey(data.public_key, chatKey);
+          const myPub = await e2ee.exportPublicKey();
+          ws.send(JSON.stringify({ type: 'e2ee-key-answer', public_key: myPub, to_user: peerName }));
+        } catch(e) {
+          console.warn('E2EE key-offer 处理失败:', e);
+        }
       })();
       break;
 
     case 'e2ee-key-answer':
       (async () => {
-        const peerName = data.from;
-        const chatKey = getChatKey(myUsername, peerName);
-        await e2ee.deriveSharedKey(data.public_key, chatKey);
+        try {
+          const peerName = data.from;
+          const chatKey = getChatKey(myUsername, peerName);
+          await e2ee.deriveSharedKey(data.public_key, chatKey);
+        } catch(e) {
+          console.warn('E2EE key-answer 处理失败:', e);
+        }
       })();
       break;
 
     case 'chat':
       (async () => {
-        const msg = data.message;
-        const ck = getChatKey(msg.from, msg.to);
-        if (msg.encrypted && msg.ciphertext && msg.iv) {
-          try {
-            const plainText = await e2ee.decrypt(msg.ciphertext, msg.iv, ck);
-            const parsed = JSON.parse(plainText);
-            msg.text = parsed.text || '';
-            msg.quote = parsed.quote || null;
-            msg.encrypted = false;
-          } catch(e) {
-            msg.text = '🔒 无法解密此消息';
+        try {
+          const msg = data.message;
+          if (!msg) return;
+          const ck = getChatKey(msg.from, msg.to);
+          if (msg.encrypted && msg.ciphertext && msg.iv) {
+            try {
+              const plainText = await e2ee.decrypt(msg.ciphertext, msg.iv, ck);
+              const parsed = JSON.parse(plainText);
+              msg.text = parsed.text || '';
+              msg.quote = parsed.quote || null;
+              msg.encrypted = false;
+            } catch(e) {
+              msg.text = '🔒 无法解密此消息';
+            }
           }
+          if (!chatHistory[ck]) chatHistory[ck] = [];
+          chatHistory[ck].push(msg);
+          if (currentChat && (msg.from === currentChat || msg.to === currentChat)) {
+            renderMessages();
+          }
+          renderContacts();
+          if (msg.to === myUsername) playNotificationSound();
+        } catch(e) {
+          console.warn('聊天消息处理失败:', e);
         }
-        if (!chatHistory[ck]) chatHistory[ck] = [];
-        chatHistory[ck].push(msg);
-        if (currentChat && (msg.from === currentChat || msg.to === currentChat)) {
-          renderMessages();
-        }
-        renderContacts();
-        if (msg.to === myUsername) playNotificationSound();
       })();
       break;
 
@@ -1093,17 +1106,25 @@ function handleMessage(data) {
       break;
 
     case 'todo-added':
-      todos.push(data.todo);
+      if (data.todo && data.todo.id) {
+        if (!todos.find(t => t.id === data.todo.id)) {
+          todos.push(data.todo);
+        }
+      }
       renderTodos();
       break;
 
     case 'todo-toggled':
-      todos = todos.map(t => t.id === data.id ? {...t, done: !t.done} : t);
+      if (data.id) {
+        todos = todos.map(t => t.id === data.id ? {...t, done: !t.done} : t);
+      }
       renderTodos();
       break;
 
     case 'todo-deleted':
-      todos = todos.filter(t => t.id !== data.id);
+      if (data.id) {
+        todos = todos.filter(t => t.id !== data.id);
+      }
       renderTodos();
       break;
 
