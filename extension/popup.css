@@ -238,6 +238,15 @@ body {
   font-weight: 500;
 }
 
+.version-badge {
+  font-size: 10px;
+  color: var(--kids-primary);
+  font-weight: 700;
+  padding: 2px 6px;
+  background: rgba(25, 200, 185, 0.15);
+  border-radius: 8px;
+}
+
 .leave-btn {
   padding: 4px 10px;
   border: none;
