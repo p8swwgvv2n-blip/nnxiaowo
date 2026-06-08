@@ -40,7 +40,7 @@ WS_PORT = 9001
 HOST = '0.0.0.0'
 FIXED_ROOM_ID = '暖暖小窝'
 ALLOWED_NAMES = ['大灰狼', '懒洋洋']
-EXTENSION_VERSION = '1.1.2'
+EXTENSION_VERSION = '1.1.3'
 HISTORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'chat_history.json')
 
 # ============================================================
