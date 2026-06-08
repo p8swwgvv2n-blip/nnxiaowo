@@ -354,12 +354,18 @@ async function enterApp() {
   updateMemberCount();
   renderAll();
 
-  // 生成 ECDH 密钥对
-  await e2ee.generateKeyPair();
+  // 生成 ECDH 密钥对（需要安全上下文）
+  try {
+    await e2ee.generateKeyPair();
 
-  // 广播公钥给所有在线成员
-  const pubKey = await e2ee.exportPublicKey();
-  send({ type: 'e2ee-key-offer', public_key: pubKey });
+    // 向每个在线成员单独发送公钥
+    const pubKey = await e2ee.exportPublicKey();
+    members.filter(m => m !== myUsername).forEach(name => {
+      send({ type: 'e2ee-key-offer', public_key: pubKey, to_user: name });
+    });
+  } catch(e) {
+    console.warn('E2EE 不可用，将使用明文传输');
+  }
 
   // 清除角标
   chrome.runtime.sendMessage({ type: 'clear-badge' });
@@ -529,7 +535,14 @@ function markVisibleAsRead() {
     to_user: currentChat
   });
 
-  renderContacts();
+  // 直接更新已读状态显示（避免重新渲染）
+  unreadIds.forEach(id => {
+    const el = container.querySelector(`.msg-row[data-msg-id="${id}"] .msg-read-status`);
+    if (el) {
+      el.textContent = '已读';
+      el.className = 'msg-read-status read';
+    }
+  });
 }
 
 let scrollTimeout = null;
@@ -596,14 +609,21 @@ async function sendChat() {
 
   const sharedKey = e2ee.sharedKeys[chatKey];
   if (sharedKey) {
-    const payload = { text: text };
-    if (quoteMsg) {
-      payload.quote = { from: quoteMsg.from, text: quoteMsg.text, id: quoteMsg.id };
+    try {
+      const payload = { text: text };
+      if (quoteMsg) {
+        payload.quote = { from: quoteMsg.from, text: quoteMsg.text, id: quoteMsg.id };
+      }
+      const encrypted = await e2ee.encrypt(JSON.stringify(payload), chatKey);
+      sendData.encrypted = true;
+      sendData.ciphertext = encrypted.ciphertext;
+      sendData.iv = encrypted.iv;
+    } catch(e) {
+      sendData.text = text;
+      if (quoteMsg) {
+        sendData.quote = { from: quoteMsg.from, text: quoteMsg.text, id: quoteMsg.id };
+      }
     }
-    const encrypted = await e2ee.encrypt(JSON.stringify(payload), chatKey);
-    sendData.encrypted = true;
-    sendData.ciphertext = encrypted.ciphertext;
-    sendData.iv = encrypted.iv;
   } else {
     // 未建立加密密钥时回退到明文（仅初始连接阶段）
     sendData.text = text;
@@ -611,8 +631,14 @@ async function sendChat() {
       sendData.quote = { from: quoteMsg.from, text: quoteMsg.text, id: quoteMsg.id };
     }
     // 同时触发密钥交换
-    const myPub = await e2ee.exportPublicKey();
-    send({ type: 'e2ee-key-offer', public_key: myPub, to_user: currentChat });
+    try {
+      if (e2ee.myKeyPair) {
+        const myPub = await e2ee.exportPublicKey();
+        send({ type: 'e2ee-key-offer', public_key: myPub, to_user: currentChat });
+      }
+    } catch(e) {
+      // crypto.subtle 不可用，跳过密钥交换
+    }
   }
 
   send(sendData);
