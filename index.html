@@ -1184,12 +1184,18 @@ async function enterApp() {
   updateMemberCount();
   renderAll();
 
-  // 生成 ECDH 密钥对
-  await e2ee.generateKeyPair();
+  // 生成 ECDH 密钥对（需要安全上下文）
+  try {
+    await e2ee.generateKeyPair();
 
-  // 广播公钥给所有在线成员
-  const pubKey = await e2ee.exportPublicKey();
-  ws.send(JSON.stringify({ type: 'e2ee-key-offer', public_key: pubKey }));
+    // 向每个在线成员单独发送公钥
+    const pubKey = await e2ee.exportPublicKey();
+    members.filter(m => m !== myUsername).forEach(name => {
+      ws.send(JSON.stringify({ type: 'e2ee-key-offer', public_key: pubKey, to_user: name }));
+    });
+  } catch(e) {
+    console.warn('E2EE 不可用（需要 HTTPS 或 localhost），将使用明文传输');
+  }
 }
 
 function updateMemberCount() {
@@ -1322,8 +1328,14 @@ function markVisibleAsRead() {
     to_user: currentChat
   });
 
-  // 更新界面
-  renderMessages();
+  // 直接更新已读状态显示（避免递归调用 renderMessages）
+  unreadIds.forEach(id => {
+    const el = container.querySelector(`.msg-row[data-msg-id="${id}"] .msg-read-status`);
+    if (el) {
+      el.textContent = '已读';
+      el.className = 'msg-read-status read';
+    }
+  });
 }
 
 // 滚动时检查新可见的消息
@@ -1347,7 +1359,7 @@ async function sendChat() {
     from: myUsername,
     to: currentChat,
     text: text,
-    time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    time: new Date().toISOString()
   };
 
   // 先添加到本地历史（即时显示）
@@ -1366,15 +1378,25 @@ async function sendChat() {
 
   const sharedKey = e2ee.sharedKeys[chatKey];
   if (sharedKey) {
-    const encrypted = await e2ee.encrypt(JSON.stringify({ text: text }), chatKey);
-    sendData.encrypted = true;
-    sendData.ciphertext = encrypted.ciphertext;
-    sendData.iv = encrypted.iv;
+    try {
+      const encrypted = await e2ee.encrypt(JSON.stringify({ text: text }), chatKey);
+      sendData.encrypted = true;
+      sendData.ciphertext = encrypted.ciphertext;
+      sendData.iv = encrypted.iv;
+    } catch(e) {
+      sendData.text = text;
+    }
   } else {
     sendData.text = text;
-    // 触发密钥交换
-    const myPub = await e2ee.exportPublicKey();
-    ws.send(JSON.stringify({ type: 'e2ee-key-offer', public_key: myPub, to_user: currentChat }));
+    // 触发密钥交换（需要 crypto.subtle）
+    try {
+      if (e2ee.myKeyPair) {
+        const myPub = await e2ee.exportPublicKey();
+        ws.send(JSON.stringify({ type: 'e2ee-key-offer', public_key: myPub, to_user: currentChat }));
+      }
+    } catch(e) {
+      // crypto.subtle 不可用（非安全上下文），跳过密钥交换
+    }
   }
 
   send(sendData);
