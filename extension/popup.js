@@ -155,7 +155,7 @@ function connect() {
 }
 
 function disconnect() {
-  chrome.runtime.sendMessage({ type: 'disconnect' });
+  safeSendMessage({ type: 'disconnect' });
   document.getElementById('app-shell').classList.remove('active');
   document.getElementById('login-page').style.display = 'flex';
   myUsername = '';
@@ -191,7 +191,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 function send(data) {
-  chrome.runtime.sendMessage({ type: 'ws-send', data: data });
+  chrome.runtime.sendMessage({ type: 'ws-send', data: data }, () => {
+    if (chrome.runtime.lastError) {} // 静默处理
+  });
+}
+
+// 安全发送消息到 background（避免 popup 关闭时的 runtime.lastError）
+function safeSendMessage(msg) {
+  try {
+    chrome.runtime.sendMessage(msg, () => {
+      if (chrome.runtime.lastError) {} // 静默处理
+    });
+  } catch(e) {}
 }
 
 // ============================================================
@@ -227,47 +238,59 @@ function handleMessage(data) {
     case 'e2ee-key-offer':
       // 收到对方公钥，派生共享密钥并回复自己的公钥
       (async () => {
-        const peerName = data.from;
-        const chatKey = getChatKey(myUsername, peerName);
-        await e2ee.deriveSharedKey(data.public_key, chatKey);
-        // 回复公钥
-        const myPub = await e2ee.exportPublicKey();
-        send({ type: 'e2ee-key-answer', public_key: myPub, to_user: peerName });
+        try {
+          const peerName = data.from;
+          const chatKey = getChatKey(myUsername, peerName);
+          await e2ee.deriveSharedKey(data.public_key, chatKey);
+          const myPub = await e2ee.exportPublicKey();
+          send({ type: 'e2ee-key-answer', public_key: myPub, to_user: peerName });
+        } catch(e) {
+          console.warn('E2EE key-offer 处理失败:', e);
+        }
       })();
       break;
 
     case 'e2ee-key-answer':
       // 收到对方回复的公钥，派生共享密钥
       (async () => {
-        const peerName = data.from;
-        const chatKey = getChatKey(myUsername, peerName);
-        await e2ee.deriveSharedKey(data.public_key, chatKey);
+        try {
+          const peerName = data.from;
+          const chatKey = getChatKey(myUsername, peerName);
+          await e2ee.deriveSharedKey(data.public_key, chatKey);
+        } catch(e) {
+          console.warn('E2EE key-answer 处理失败:', e);
+        }
       })();
       break;
 
     case 'chat':
       // 解密消息
       (async () => {
-        const msg = data.message;
-        const ck = getChatKey(msg.from, msg.to);
-        if (msg.encrypted && msg.ciphertext && msg.iv) {
-          try {
-            const plainText = await e2ee.decrypt(msg.ciphertext, msg.iv, ck);
-            const parsed = JSON.parse(plainText);
-            msg.text = parsed.text || '';
-            msg.quote = parsed.quote || null;
-            msg.encrypted = false;
-          } catch(e) {
-            msg.text = '🔒 无法解密此消息';
+        try {
+          const msg = data.message;
+          if (!msg) return;
+          const ck = getChatKey(msg.from, msg.to);
+          if (msg.encrypted && msg.ciphertext && msg.iv) {
+            try {
+              const plainText = await e2ee.decrypt(msg.ciphertext, msg.iv, ck);
+              const parsed = JSON.parse(plainText);
+              msg.text = parsed.text || '';
+              msg.quote = parsed.quote || null;
+              msg.encrypted = false;
+            } catch(e) {
+              msg.text = '🔒 无法解密此消息';
+            }
           }
+          if (!chatHistory[ck]) chatHistory[ck] = [];
+          chatHistory[ck].push(msg);
+          if (currentChat && (msg.from === currentChat || msg.to === currentChat)) {
+            renderMessages();
+          }
+          renderContacts();
+          if (msg.to === myUsername) playNotificationSound();
+        } catch(e) {
+          console.warn('聊天消息处理失败:', e);
         }
-        if (!chatHistory[ck]) chatHistory[ck] = [];
-        chatHistory[ck].push(msg);
-        if (currentChat && (msg.from === currentChat || msg.to === currentChat)) {
-          renderMessages();
-        }
-        renderContacts();
-        if (msg.to === myUsername) playNotificationSound();
       })();
       break;
 
@@ -291,20 +314,24 @@ function handleMessage(data) {
 
     case 'todo-added':
       // 避免重复添加（乐观更新可能已存在）
-      if (!todos.find(t => t.id === data.todo.id)) {
+      if (data.todo && data.todo.id && !todos.find(t => t.id === data.todo.id)) {
         todos.push(data.todo);
       }
       renderTodos();
       break;
 
     case 'todo-toggled':
-      const t = todos.find(t => t.id === data.id);
-      if (t) t.done = !t.done;
+      if (data.id) {
+        const t = todos.find(t => t.id === data.id);
+        if (t) t.done = !t.done;
+      }
       renderTodos();
       break;
 
     case 'todo-deleted':
-      todos = todos.filter(t => t.id !== data.id);
+      if (data.id) {
+        todos = todos.filter(t => t.id !== data.id);
+      }
       renderTodos();
       break;
 
@@ -368,7 +395,7 @@ async function enterApp() {
   }
 
   // 清除角标
-  chrome.runtime.sendMessage({ type: 'clear-badge' });
+  safeSendMessage({ type: 'clear-badge' });
 }
 
 function showLanIps(ips) {
@@ -813,7 +840,7 @@ function playNotificationSound() {
   if (versionBadge) versionBadge.textContent = `v${version}`;
 
   // 打开插件时清除角标
-  chrome.runtime.sendMessage({ type: 'clear-badge' });
+  safeSendMessage({ type: 'clear-badge' });
 
   // 检查是否有保存的会话，自动恢复
   chrome.runtime.sendMessage({ type: 'get-session' }, (session) => {
